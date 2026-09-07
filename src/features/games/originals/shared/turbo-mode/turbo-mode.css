@@ -1,0 +1,7 @@
+.ds-turbo-mode-toggle[data-state='checked'] {
+  background-color: var(--ds-purple-500);
+}
+
+.ds-turbo-mode-toggle[data-state='unchecked'] {
+  background-color: var(--ds-gray-800);
+}

@@ -1,0 +1,37 @@
+/* Production glass treatment, applied through the shared GradientCard primitive. */
+@utility ds-game-win-modal-card {
+  background:
+    radial-gradient(
+        ellipse 100% 523.33% at 0% 50%,
+        rgb(from var(--color-ds-lime-300) r g b / 0) 40%,
+        rgb(from var(--color-ds-lime-300) r g b / 0.2) 100%
+      )
+      padding-box,
+    linear-gradient(
+        rgb(from var(--ds-game-win-modal-surface-overlay) r g b / 0.4),
+        rgb(from var(--ds-game-win-modal-surface-overlay) r g b / 0.4)
+      )
+      padding-box,
+    linear-gradient(
+        to right,
+        rgb(from var(--ds-game-win-modal-border-neutral) r g b / 0.6),
+        rgb(from var(--ds-game-win-modal-border-accent) r g b / 0.6)
+      )
+      border-box;
+  backdrop-filter: blur(12px);
+}
+
+@utility ds-game-win-modal-currency-icon {
+  box-shadow: 0 2.909px 11.636px 0 rgb(from var(--color-ds-lime-300) r g b / 0.5);
+
+  & img,
+  & picture,
+  & [data-slot='image'] {
+    block-size: 100%;
+    inline-size: 100%;
+  }
+
+  & img {
+    object-fit: cover;
+  }
+}

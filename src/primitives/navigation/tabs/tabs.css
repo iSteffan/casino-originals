@@ -1,0 +1,110 @@
+@utility ds-tabs-glow {
+  border-radius: var(--ds-radius-xs);
+  background:
+    radial-gradient(
+      55.78% 72.73% at 50% 100%,
+      color-mix(in srgb, var(--color-ds-purple-500) 40%, transparent) 0%,
+      rgb(from var(--color-ds-purple-400) r g b / 0) 80%
+    ),
+    var(--color-ds-button-gray-default-background);
+}
+
+@utility ds-tabs-glow-list {
+  border-radius: calc(var(--ds-radius-xs) + var(--ds-spacing-0-5));
+}
+
+@utility ds-tabs-game-trigger {
+  border-color: var(--color-ds-border-tertiary);
+  background: var(--color-ds-surface-secondary);
+  transition:
+    background var(--ds-duration-base) var(--ds-ease-standard),
+    border-color var(--ds-duration-base) var(--ds-ease-standard),
+    color var(--ds-duration-base) var(--ds-ease-standard);
+}
+
+@utility ds-tabs-game-trigger-glow {
+  &[data-state='active'] {
+    border-color: var(--color-ds-purple-700);
+    background:
+      radial-gradient(
+        55.78% 72.73% at 50% 100%,
+        color-mix(in srgb, var(--color-ds-purple-500) 40%, transparent) 0%,
+        rgb(from var(--color-ds-purple-400) r g b / 0) 80%
+      ),
+      var(--color-ds-button-gray-default-background);
+  }
+
+  &[data-state='inactive']:hover {
+    border-color: var(--color-ds-purple-700);
+    background:
+      radial-gradient(
+        55.78% 72.73% at 50% 100%,
+        color-mix(in srgb, var(--color-ds-purple-500) 24%, transparent) 0%,
+        transparent 100%
+      ),
+      var(--color-ds-surface-secondary);
+  }
+}
+
+@keyframes ds-tabs-content-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--ds-spacing-1);
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+[data-slot='tabs'][data-interacted]
+  > [data-slot='tabs-content'][data-state='active'].ds-tabs-content-appear {
+  animation: ds-tabs-content-in var(--ds-duration-base) var(--ds-ease-entrance);
+}
+
+/* The active tab has a server-rendered surface until JS positions the shared indicator. */
+[data-slot='tabs-list'][data-indicator-ready='false'][data-indicator-color='default']
+  [data-slot='tabs-trigger'][data-state='active'] {
+  border-radius: var(--radius-ds-5px);
+  background: var(--color-ds-surface-tertiary);
+}
+
+[data-slot='tabs-list'][data-indicator-ready='false'][data-indicator-color='brand']
+  [data-slot='tabs-trigger'][data-state='active'] {
+  border-radius: var(--radius-ds-5px);
+  background: var(--color-ds-brand-secondary);
+}
+
+[data-slot='tabs-list'][data-indicator-ready='false'][data-indicator-color='white']
+  [data-slot='tabs-trigger'][data-state='active'] {
+  border-radius: var(--radius-ds-5px);
+  background: var(--color-ds-text-primary);
+}
+
+[data-slot='tabs-list'][data-indicator-ready='false'][data-indicator-color='glow']
+  [data-slot='tabs-trigger'][data-state='active'] {
+  border-radius: var(--ds-radius-xs);
+  background:
+    radial-gradient(
+      55.78% 72.73% at 50% 100%,
+      color-mix(in srgb, var(--color-ds-purple-500) 40%, transparent) 0%,
+      rgb(from var(--color-ds-purple-400) r g b / 0) 80%
+    ),
+    var(--color-ds-button-gray-default-background);
+}
+
+/* Native scrollbar hidden via plain CSS — Tailwind v4 mangles ::-webkit-scrollbar in @utility/arbitrary variants */
+[data-slot='tabs-list-viewport'] {
+  scrollbar-width: none;
+}
+
+[data-slot='tabs-list-viewport']::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='tabs'][data-interacted]
+    > [data-slot='tabs-content'][data-state='active'].ds-tabs-content-appear {
+    animation: none;
+  }
+}

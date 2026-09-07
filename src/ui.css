@@ -1,0 +1,17 @@
+/** Component styles required by originals shared UI. */
+@import './features/games/originals/originals-config/originals-config.css';
+@import './features/games/originals/shared/autobet-session-status/autobet-session-status.css';
+@import './features/games/originals/shared/bet-amount-input/bet-amount-input.css';
+@import './features/games/originals/shared/game-win-modal/game-win-modal.css';
+@import './features/games/originals/shared/last-results/last-results.css';
+@import './features/games/originals/shared/option-group/option-group.css';
+@import './features/games/originals/shared/originals-field.css';
+@import './features/games/originals/shared/rounds-input/rounds-input.css';
+@import './features/games/originals/shared/stop-conditions/stop-conditions.css';
+@import './features/games/originals/shared/turbo-mode/turbo-mode.css';
+@import './features/games/shared/game-player/games-volume/games-volume.css';
+@import './lib/animations.css';
+@import './lib/overlay.css';
+@import './primitives/actions/button/button.css';
+@import './primitives/data-display/gradient-card/gradient-card.css';
+@import './primitives/navigation/tabs/tabs.css';

@@ -1,0 +1,55 @@
+@utility ds-shadow-overlay {
+  box-shadow:
+    0 4px 8px rgb(from var(--color-ds-black) r g b / 0.4),
+    0 8px 16px rgb(from var(--color-ds-surface-primary) r g b / 0.8);
+}
+
+@utility ds-scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ds-border-primary) transparent;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Webkit thumb styling — plain CSS because Tailwind v4 mangles ::-webkit-scrollbar in @utility */
+.ds-scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ds-scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-ds-border-primary);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: var(--radius-ds-full);
+}
+
+.ds-scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@utility ds-ring-focus {
+  box-shadow: inset 0 0 0 1px var(--color-ds-border-focus);
+}
+
+@utility ds-ring-error {
+  box-shadow: inset 0 0 0 1px var(--color-ds-border-error);
+}
+
+/* Direct outline (not Tailwind's --tw-outline-style utilities, which outline-none zeroes out in v4) */
+@utility ds-focus-ring {
+  outline: 2px solid var(--color-ds-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Focus treatment for controls that live inside clipping/scrolling viewports. */
+@utility ds-focus-ring-inset {
+  outline: 2px solid var(--color-ds-focus-ring);
+  outline-offset: -2px;
+}

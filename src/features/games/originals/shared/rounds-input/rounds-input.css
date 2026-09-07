@@ -1,0 +1,14 @@
+/* readOnly still lets a click focus/caret the field; fully block pointer input in infinite mode */
+.ds-rounds-input-field--infinite [data-slot='input'] {
+  pointer-events: none;
+}
+
+.ds-rounds-input-field--infinite:not([data-disabled]) [data-slot='input']::placeholder {
+  color: var(--color-ds-text-primary);
+  opacity: 1;
+}
+
+.ds-rounds-input-field--infinite[data-disabled] [data-slot='input']::placeholder {
+  color: var(--color-ds-text-tertiary);
+  opacity: 1;
+}

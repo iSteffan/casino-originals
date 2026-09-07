@@ -10,6 +10,10 @@ import { definePreview } from '@storybook/nextjs-vite';
 import { themes } from 'storybook/theming';
 import pseudoStates from 'storybook-addon-pseudo-states';
 
+if (typeof document !== 'undefined') {
+  document.body.setAttribute('data-ds-motion-root', '');
+}
+
 function onIntlError(error: IntlError) {
   if (error.code === IntlErrorCode.MISSING_MESSAGE) return;
   console.error(error);
@@ -42,7 +46,7 @@ export default definePreview({
   parameters: {
     options: {
       storySort: {
-        order: ['Intro', 'Primitives', 'Features'],
+        order: ['Features', ['Games', ['Originals']]],
       },
     },
     docs: {
@@ -50,8 +54,8 @@ export default definePreview({
     },
     backgrounds: {
       options: {
-        dark: { name: 'Dark', value: '#121418' },
-        light: { name: 'Light', value: '#ffffff' },
+        dark: { name: 'Dark', value: 'var(--color-ds-surface-primary)' },
+        light: { name: 'Light', value: 'var(--color-ds-white)' },
       },
     },
     controls: {

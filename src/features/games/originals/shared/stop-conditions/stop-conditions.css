@@ -1,0 +1,7 @@
+.ds-stop-conditions-percentage-field [data-slot='input'] {
+  text-align: right;
+}
+
+.ds-stop-conditions-currency-field[data-slot='input-wrapper'] {
+  gap: 0;
+}

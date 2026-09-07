@@ -1,0 +1,136 @@
+@utility ds-gradient-card {
+  --gc-accent-color: var(--color-ds-gray-500);
+  --gc-accent-opacity: 40%;
+  --gc-accent-position: 0% 0%;
+  --gc-accent-size: 50% 100%;
+  --gc-fade-size: 133.92% 97.16%;
+  --gc-border-accent-opacity: 52%;
+  --gc-border-accent-size: 170% 65%;
+  --gc-border-neutral-opacity: 0%;
+  --gc-surface: var(--color-ds-surface-primary);
+
+  position: relative;
+  border: 1px solid transparent;
+  /* Gradient border via padding-box/border-box stack (same technique as cta-banner):
+     opaque padding-box layers hide the border-box glows everywhere except the 1px ring. */
+  background:
+    radial-gradient(
+        var(--gc-accent-size) at var(--gc-accent-position),
+        color-mix(in srgb, var(--gc-accent-color) var(--gc-accent-opacity), transparent)
+          0%,
+        transparent 100%
+      )
+      padding-box,
+    radial-gradient(
+        var(--gc-fade-size) at 50% 50%,
+        transparent 0%,
+        var(--color-ds-surface-secondary) 100%
+      )
+      padding-box,
+    linear-gradient(var(--gc-surface), var(--gc-surface)) padding-box,
+    radial-gradient(
+        var(--gc-border-accent-size) at var(--gc-accent-position),
+        color-mix(
+            in srgb,
+            var(--gc-accent-color) var(--gc-border-accent-opacity),
+            transparent
+          )
+          0%,
+        transparent 60%
+      )
+      border-box,
+    radial-gradient(
+        170% 65% at 0% 0%,
+        color-mix(
+            in srgb,
+            var(--color-ds-gray-500) var(--gc-border-neutral-opacity),
+            transparent
+          )
+          0%,
+        transparent 55%
+      )
+      border-box,
+    linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-ds-gray-100) 8%, transparent) 0%,
+        transparent 55%
+      )
+      border-box;
+}
+
+.ds-gradient-card[data-surface='secondary'] {
+  --gc-surface: var(--color-ds-surface-secondary);
+}
+
+/* lime/purple = the exact former .bs-cta-banner-frame-* stacks; the opaque
+   padding-box base uses var(--gc-surface) so surface stays independent. */
+.ds-gradient-card[data-tone='lime'] {
+  background:
+    radial-gradient(
+        ellipse 52% 120% at 0% 0%,
+        color-mix(in srgb, var(--color-ds-gray-500) 40%, transparent) 0%,
+        transparent 62%
+      )
+      padding-box,
+    radial-gradient(
+        ellipse 46% 120% at 100% 0%,
+        color-mix(in srgb, var(--color-ds-brand-primary) 16%, transparent) 0%,
+        transparent 62%
+      )
+      padding-box,
+    linear-gradient(var(--gc-surface), var(--gc-surface)) padding-box,
+    radial-gradient(
+        ellipse 60% 340% at 0% 0%,
+        color-mix(in srgb, var(--color-ds-gray-500) 55%, transparent) 0%,
+        transparent 55%
+      )
+      border-box,
+    radial-gradient(
+        ellipse 55% 340% at 100% 0%,
+        color-mix(in srgb, var(--color-ds-brand-primary) 42%, transparent) 0%,
+        transparent 55%
+      )
+      border-box,
+    linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-ds-gray-100) 11%, transparent) 0%,
+        color-mix(in srgb, var(--color-ds-gray-100) 2%, transparent) 45%,
+        transparent 80%
+      )
+      border-box;
+}
+
+.ds-gradient-card[data-tone='purple'] {
+  background:
+    radial-gradient(
+        ellipse 60% 80% at 0% 0%,
+        color-mix(in srgb, var(--color-ds-gray-500) 40%, transparent) 0%,
+        transparent 70%
+      )
+      padding-box,
+    radial-gradient(
+        ellipse 42% 90% at 100% 100%,
+        color-mix(in srgb, var(--color-ds-purple-400) 20%, transparent) 0%,
+        transparent 70%
+      )
+      padding-box,
+    linear-gradient(var(--gc-surface), var(--gc-surface)) padding-box,
+    radial-gradient(
+        ellipse 170% 65% at 0% 0%,
+        color-mix(in srgb, var(--color-ds-gray-500) 52%, transparent) 0%,
+        transparent 55%
+      )
+      border-box,
+    radial-gradient(
+        ellipse 150% 80% at 100% 100%,
+        color-mix(in srgb, var(--color-ds-purple-400) 56%, transparent) 0%,
+        transparent 60%
+      )
+      border-box,
+    linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-ds-gray-100) 8%, transparent) 0%,
+        transparent 55%
+      )
+      border-box;
+}

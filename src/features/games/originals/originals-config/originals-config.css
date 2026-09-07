@@ -1,0 +1,104 @@
+:root {
+  --originals-config-width: 280px;
+}
+
+@utility ds-originals-config-shell {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: auto;
+  flex-direction: column;
+  gap: var(--ds-spacing-3);
+  border-radius: var(--ds-radius-md);
+  background-color: var(--color-ds-surface-secondary);
+  padding: var(--ds-spacing-4);
+}
+
+@media (min-width: 1024px) {
+  .ds-originals-config-shell {
+    width: var(--originals-config-width);
+    max-width: var(--originals-config-width);
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+@utility ds-originals-config-action {
+  height: 2.5rem;
+  width: 100%;
+  border-radius: var(--radius-ds-2xs);
+}
+
+@utility ds-originals-config-secondary-slide {
+  overflow: hidden;
+  max-height: 0;
+  margin-bottom: 0;
+  opacity: 0;
+  transition-property: max-height, opacity, margin-bottom;
+  transition-duration: var(--ds-duration-slower);
+  transition-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility ds-originals-config-secondary-slide-open {
+  max-height: 2rem;
+  margin-bottom: var(--ds-spacing-2);
+  opacity: 1;
+}
+
+.ds-originals-config-action > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mines config tabs: track 24px, trigger 20px, 2px inset, 8px / 6px radius */
+.ds-originals-config-shell [data-slot='tabs-list-viewport'] {
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--ds-radius-xs);
+  background-color: var(--color-ds-surface-tertiary);
+  padding: 2px;
+}
+
+.ds-originals-config-shell [data-slot='tabs-list'] {
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  padding: 0;
+}
+
+.ds-originals-config-shell [data-slot='tabs-indicator'] {
+  border-radius: var(--radius-ds-2xs);
+}
+
+.ds-originals-config-shell [data-slot='tabs-trigger'] {
+  display: flex;
+  height: 1.25rem;
+  min-height: 1.25rem;
+  max-height: 1.25rem;
+  flex: 1 1 0%;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ds-2xs);
+  padding: 0;
+  font-size: var(--ds-text-body-md);
+  line-height: var(--ds-leading-solid);
+  letter-spacing: var(--ds-tracking-body-md);
+  font-weight: var(--ds-font-weight-medium);
+}
+
+.ds-originals-config-shell [data-slot='tabs-trigger'][data-state='inactive'] {
+  color: var(--color-ds-text-secondary);
+}
+
+.ds-originals-config-shell [data-slot='tabs-trigger'][data-state='active'] {
+  color: var(--color-ds-text-white);
+}
+
+.ds-originals-config-shell [data-slot='tabs-trigger']:hover[data-state='inactive'] {
+  color: var(--color-ds-text-white);
+}

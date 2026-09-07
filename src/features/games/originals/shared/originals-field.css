@@ -1,0 +1,22 @@
+@utility ds-originals-field {
+  border-radius: var(--radius-ds-2xs);
+}
+
+/* Suppress the Input primitive's focus border on purpose: originals fields keep the ring-only focus look. */
+.ds-originals-field:focus-within {
+  border-color: transparent;
+}
+
+.ds-originals-field [data-slot='input']::placeholder {
+  color: var(--color-ds-text-secondary);
+  font-weight: var(--ds-font-weight-medium);
+}
+
+.ds-originals-field[data-disabled] {
+  cursor: not-allowed;
+}
+
+.ds-originals-field[data-disabled] [data-slot='input']::placeholder {
+  color: var(--color-ds-text-tertiary);
+  opacity: 1;
+}

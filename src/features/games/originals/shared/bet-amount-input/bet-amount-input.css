@@ -1,0 +1,49 @@
+.ds-bet-amount-input-currency-icon {
+  position: relative;
+  display: flex;
+  height: 22px;
+  width: 22px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ds-full);
+  background: var(--color-ds-surface-primary);
+  box-shadow: 0 2px 8px 0 rgb(from var(--color-ds-lime-300) r g b / 0.5);
+}
+
+.ds-bet-amount-label-tooltip-content {
+  max-width: 320px;
+  background-color: var(--color-ds-gray-150);
+  color: var(--color-ds-gray-950);
+}
+
+.ds-bet-amount-label-tooltip-content svg {
+  fill: var(--color-ds-gray-150);
+}
+
+.ds-bet-amount-label-tooltip-title,
+.ds-bet-amount-label-tooltip-description {
+  font-size: var(--text-ds-body-md);
+  line-height: var(--leading-ds-body-md);
+  letter-spacing: var(--tracking-ds-body-md);
+  text-align: center;
+  color: var(--color-ds-gray-950);
+}
+
+.ds-bet-amount-label-tooltip-title {
+  margin-bottom: var(--ds-spacing-1);
+  font-weight: var(--ds-font-weight-bold);
+}
+
+.ds-bet-amount-label-tooltip-description {
+  font-weight: var(--ds-font-weight-regular);
+}
+
+@media (min-width: 768px) {
+  .ds-bet-amount-label-tooltip-title,
+  .ds-bet-amount-label-tooltip-description {
+    font-size: var(--text-ds-body-lg);
+    line-height: var(--leading-ds-body-lg);
+    letter-spacing: var(--tracking-ds-body-lg);
+  }
+}

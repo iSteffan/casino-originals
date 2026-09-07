@@ -1,11 +1,16 @@
+@import './fonts.css';
 @import 'tailwindcss';
+@plugin 'tailwindcss-animate';
+@import './theme.ds.css';
+@import './ui.css';
 
 @source './';
 @source '../.storybook';
 
 body {
-  background-color: #121418;
-  color: #f5f5f5;
+  background-color: var(--color-ds-surface-primary);
+  color: var(--color-ds-text-primary);
+  font-family: var(--font-ds-text);
 }
 
 html,

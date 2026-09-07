@@ -1,0 +1,62 @@
+@utility ds-autobet-session-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-spacing-2);
+  border-radius: var(--radius-ds-2xs);
+  background-color: var(--ds-black);
+  padding: var(--ds-spacing-2);
+}
+
+@utility ds-autobet-session-status-stat-label {
+  font-size: var(--ds-text-body-sm);
+  line-height: var(--ds-leading-body-sm);
+  letter-spacing: var(--ds-tracking-body-sm);
+  font-weight: var(--ds-font-weight-regular);
+  color: var(--ds-gray-600);
+  text-align: center;
+}
+
+@utility ds-autobet-session-status-stat-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ds-text-body-md);
+  line-height: var(--ds-leading-body-md);
+  letter-spacing: var(--ds-tracking-body-md);
+  font-weight: var(--ds-font-weight-medium);
+  color: var(--ds-white);
+  text-align: center;
+}
+
+@utility ds-autobet-session-status-status-title {
+  font-size: var(--ds-text-body-sm);
+  line-height: var(--ds-leading-body-sm);
+  letter-spacing: var(--ds-tracking-body-sm);
+  font-weight: var(--ds-font-weight-medium);
+  text-align: center;
+}
+
+@utility ds-autobet-session-status-status-subtitle {
+  font-size: var(--ds-text-body-sm);
+  line-height: var(--ds-leading-body-sm);
+  letter-spacing: var(--ds-tracking-body-sm);
+  font-weight: var(--ds-font-weight-regular);
+}
+
+@utility ds-autobet-session-status-live-dot {
+  height: 0.375rem;
+  width: 0.375rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-ds-full);
+  background-color: var(--ds-success-500);
+}
+
+@utility ds-autobet-session-status-live-dot-pulse {
+  --ds-autobet-live-dot-pulse-duration: 2s;
+  --ds-autobet-live-dot-pulse-ease: cubic-bezier(0.4, 0, 0.6, 1);
+
+  animation: pulse var(--ds-autobet-live-dot-pulse-duration)
+    var(--ds-autobet-live-dot-pulse-ease) infinite;
+}

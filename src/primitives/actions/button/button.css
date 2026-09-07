@@ -1,0 +1,45 @@
+@utility ds-button-ghost-glow {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border: 1px solid transparent;
+    border-radius: inherit;
+    background:
+      radial-gradient(
+          circle at 0% 0%,
+          color-mix(in srgb, var(--color-ds-foreground-tertiary) 40%, transparent),
+          transparent 70%
+        )
+        padding-box,
+      radial-gradient(
+          circle at 100% 100%,
+          color-mix(in srgb, var(--color-ds-purple-400) 20%, transparent),
+          transparent 70%
+        )
+        padding-box,
+      linear-gradient(
+          var(--color-ds-surface-secondary),
+          var(--color-ds-surface-secondary)
+        )
+        padding-box,
+      linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--color-ds-foreground-tertiary) 40%, transparent),
+          color-mix(in srgb, var(--color-ds-purple-400) 40%, transparent)
+        )
+        border-box;
+    opacity: 0;
+    transition: opacity var(--ds-duration-base) var(--ds-ease-standard);
+    pointer-events: none;
+  }
+
+  &:hover::before,
+  &:focus-visible::before {
+    opacity: 1;
+  }
+}

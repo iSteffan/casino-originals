@@ -13,11 +13,7 @@
   },
   "dependencies": {
     "@number-flow/react": "^0.5.9",
-    "@radix-ui/react-checkbox": "^1.3.3",
-    "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.15",
-    "@radix-ui/react-radio-group": "^1.3.8",
-    "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-slider": "^1.3.6",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
@@ -35,6 +31,7 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "tailwind-merge": "^3.0.2",
+    "tailwindcss-animate": "^1.0.7",
     "use-haptic": "^1.1.11",
     "zod": "^3.24.3"
   },
@@ -58,7 +55,10 @@
   },
   "imports": {
     "#ui/*": {
-      "types": ["./src/*.ts", "./src/*.tsx"],
+      "types": [
+        "./src/*.ts",
+        "./src/*.tsx"
+      ],
       "default": "./src/*"
     }
   }
