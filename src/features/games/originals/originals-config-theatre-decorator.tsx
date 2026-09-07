@@ -32,7 +32,7 @@ export function OriginalsConfigStoryLayout({
   children,
 }: OriginalsConfigStoryLayoutProps) {
   return (
-    <div className="bg-ds-black flex min-h-screen items-start justify-center p-8">
+    <div className="bg-ds-black flex min-h-screen items-start justify-center p-ds-8">
       <div
         className={cn(
           'min-h-0 w-full max-w-[900px]',

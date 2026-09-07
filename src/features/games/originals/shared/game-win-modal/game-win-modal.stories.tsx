@@ -47,7 +47,7 @@ function GameWinModalPlayground({
   }, [openArg]);
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
+    <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-ds-4">
       <div className="h-78 bg-ds-black rounded-ds-sm relative w-full overflow-hidden">
         <GameWinModal
           open={open}
@@ -60,7 +60,7 @@ function GameWinModalPlayground({
           contentClassName={contentClassName}
         />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-ds-2">
         <Button type="button" onClick={() => setOpen(true)}>
           Show win
         </Button>

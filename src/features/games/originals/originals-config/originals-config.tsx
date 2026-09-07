@@ -151,7 +151,8 @@ export function OriginalsConfig({
           <TabsList
             color="brand"
             variant="filled"
-            containerClassName="overflow-visible border-transparent"
+            className="w-full"
+            containerClassName="overflow-visible w-full border-transparent"
           >
             <TabsTrigger value="manual" disabled={tabsDisabled}>
               {manualTabLabel}

@@ -58,6 +58,7 @@
 /* Mines config tabs: track 24px, trigger 20px, 2px inset, 8px / 6px radius */
 .ds-originals-config-shell [data-slot='tabs-list-viewport'] {
   height: 1.5rem;
+  width: 100%;
   border: none;
   border-radius: var(--ds-radius-xs);
   background-color: var(--color-ds-surface-tertiary);
@@ -80,6 +81,7 @@
   height: 1.25rem;
   min-height: 1.25rem;
   max-height: 1.25rem;
+  min-width: 0;
   flex: 1 1 0%;
   align-items: center;
   justify-content: center;
@@ -89,6 +91,13 @@
   line-height: var(--ds-leading-solid);
   letter-spacing: var(--ds-tracking-body-md);
   font-weight: var(--ds-font-weight-medium);
+}
+
+.ds-originals-config-shell [data-slot='tabs-trigger'] > span {
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
 }
 
 .ds-originals-config-shell [data-slot='tabs-trigger'][data-state='inactive'] {

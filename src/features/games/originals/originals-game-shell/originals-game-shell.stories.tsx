@@ -12,6 +12,7 @@ import { Typography } from '#ui/primitives/foundation/typography/typography';
 
 function OriginalsGameShellExample({ theatreMode = false }: { theatreMode?: boolean }) {
   const [isTheatreMode, setIsTheatreMode] = useState(theatreMode);
+  const [volume, setVolume] = useState(0.75);
 
   useEffect(() => {
     setIsTheatreMode(theatreMode);
@@ -30,6 +31,9 @@ function OriginalsGameShellExample({ theatreMode = false }: { theatreMode?: bool
           <GameHeader
             title="Original game"
             backHref="#"
+            showVolumeControl
+            volume={volume}
+            onVolumeChange={setVolume}
             isTheatreMode={isTheatreMode}
             onTheatreToggle={() => setIsTheatreMode((value) => !value)}
           />

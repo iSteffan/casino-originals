@@ -55,7 +55,7 @@ function LastResultsPlayground({
   }, []);
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-ds-4">
       <LastResults
         items={items}
         getItemKey={(item) => item.id}
@@ -80,7 +80,7 @@ function LastResultsPlayground({
         aria-label="Last results"
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-ds-2">
         <Button type="button" onClick={addItem}>
           Add result
         </Button>

@@ -11,7 +11,7 @@ const ORIGINALS_CONFIG_WIDTH = 280;
 function OriginalsConfigWidthDecorator(Story: () => ReactNode) {
   return (
     <div
-      className="bg-ds-gray-900 rounded-ds-md p-ds-4 max-w-full"
+      className="bg-ds-gray-900 rounded-ds-md p-ds-6 max-w-full"
       style={{ width: ORIGINALS_CONFIG_WIDTH }}
     >
       <Story />
