@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@source './';
+@source '../.storybook';
+
+body {
+  background-color: #121418;
+  color: #f5f5f5;
+}
+
+html,
+body {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+body.sb-show-main.sb-main-centered {
+  align-items: safe center;
+}
+
+body.sb-show-main.sb-main-centered #storybook-root {
+  max-height: none;
+}

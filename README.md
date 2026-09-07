@@ -1,2 +1,8 @@
 # casino-originals
-A collection of original iGaming games developed with React, Next.js, TypeScript, and modern frontend technologies.
+
+Frontend-only originals games demo (Next.js + Storybook). No backend or websocket.
+
+```bash
+pnpm dev
+pnpm storybook
+```
