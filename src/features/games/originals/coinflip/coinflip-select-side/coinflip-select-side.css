@@ -1,0 +1,12 @@
+@utility ds-coinflip-select-side-heads-glow {
+  box-shadow:
+    0 4px 10px 0 color-mix(in srgb, var(--ds-lime-300) 40%, transparent),
+    0 16px 60px 0 color-mix(in srgb, var(--ds-lime-300) 50%, transparent);
+}
+
+@utility ds-coinflip-select-side-tails-glow {
+  box-shadow:
+    0 4px 14px 0 rgb(from var(--ds-coinflip-tails-glow-primary) r g b / 0.65),
+    0 16px 70px 0 rgb(from var(--ds-coinflip-tails-glow-primary) r g b / 0.7),
+    0 0 28px 0 rgb(from var(--ds-coinflip-tails-glow-secondary) r g b / 0.55);
+}

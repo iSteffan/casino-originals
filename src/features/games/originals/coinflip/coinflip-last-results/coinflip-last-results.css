@@ -1,0 +1,19 @@
+.ds-coinflip-last-results {
+  padding-inline: var(--spacing-ds-4);
+  /* Track starts at left-10 (2.5rem) from the board edge — no offset padding on items */
+  --last-results-lead-inset: 0;
+}
+
+.ds-coinflip-last-results .ds-last-results-lead-toward-end {
+  left: var(--spacing-ds-4);
+  right: auto;
+  z-index: 2;
+}
+
+/* Match web: results live in a clipped region that starts after the lead (left-10) */
+.ds-coinflip-last-results .ds-last-results-viewport {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  margin-inline-start: var(--spacing-ds-6);
+}

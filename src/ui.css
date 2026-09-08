@@ -1,5 +1,8 @@
 /** Component styles required by originals shared UI. */
 @import './features/games/originals/originals-config/originals-config.css';
+@import './features/games/originals/coinflip/coinflip.tokens.css';
+@import './features/games/originals/coinflip/coinflip-last-results/coinflip-last-results.css';
+@import './features/games/originals/coinflip/coinflip-select-side/coinflip-select-side.css';
 @import './features/games/originals/shared/autobet-session-status/autobet-session-status.css';
 @import './features/games/originals/shared/bet-amount-input/bet-amount-input.css';
 @import './features/games/originals/shared/game-win-modal/game-win-modal.css';

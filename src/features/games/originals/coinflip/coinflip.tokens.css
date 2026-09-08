@@ -1,0 +1,8 @@
+:root {
+  --coinflip-select-side-coin-size: 100px;
+}
+
+@utility ds-coinflip-select-side-coin {
+  width: var(--coinflip-select-side-coin-size);
+  height: var(--coinflip-select-side-coin-size);
+}
