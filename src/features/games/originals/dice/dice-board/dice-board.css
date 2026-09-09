@@ -1,0 +1,57 @@
+@utility dice-board-play-area {
+  background: radial-gradient(
+    47.27% 62.98% at 50% 62.98%,
+    var(--ds-gray-850) 0%,
+    var(--ds-black) 100%
+  );
+}
+
+@utility dice-board-shell {
+  background-color: var(--ds-black);
+}
+
+@utility dice-board-value-size {
+  font-size: 36px;
+  font-weight: var(--ds-font-weight-bold);
+  letter-spacing: var(--ds-tracking-gift-card-amount);
+  text-align: center;
+
+  @media (width >= 40rem) {
+    font-size: var(--ds-text-2xl);
+    letter-spacing: -1.28px;
+  }
+}
+
+@utility dice-board-value-text {
+  background: linear-gradient(
+    180deg,
+    var(--ds-white) 0%,
+    var(--ds-gray-550) 50%,
+    var(--ds-white) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke-width: 0.5px;
+  -webkit-text-stroke-color: var(--ds-button-gray-foreground);
+}
+
+.dice-board-rolled-number-text {
+  background: var(
+    --dice-board-number-gradient,
+    linear-gradient(
+      180deg,
+      var(--ds-white) 0%,
+      var(--ds-gray-550) 50%,
+      var(--ds-white) 100%
+    )
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke-width: 0.5px;
+  -webkit-text-stroke-color: var(
+    --dice-board-number-stroke,
+    var(--ds-button-gray-foreground)
+  );
+}

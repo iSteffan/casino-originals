@@ -1,0 +1,123 @@
+@keyframes diceCubeMarkerBounceRight {
+  0% {
+    transform: translateY(0) rotateZ(0deg);
+  }
+
+  35% {
+    transform: translateY(-182px) rotateZ(180deg);
+  }
+
+  65% {
+    transform: translateY(-10px) rotateZ(220deg);
+  }
+
+  75% {
+    transform: translateY(-22px) rotateZ(260deg);
+  }
+
+  85% {
+    transform: translateY(-10px) rotateZ(300deg);
+  }
+
+  95% {
+    transform: translateY(-8px) rotateZ(330deg);
+  }
+
+  100% {
+    transform: translateY(0) rotateZ(360deg);
+  }
+}
+
+.dice-cube-travel-animate {
+  transition: transform var(--dice-cube-animation-duration) var(--ds-ease-entrance);
+}
+
+@keyframes diceCubeMarkerBounceLeft {
+  0% {
+    transform: translateY(0) rotateZ(0deg);
+  }
+
+  35% {
+    transform: translateY(-182px) rotateZ(-180deg);
+  }
+
+  65% {
+    transform: translateY(-10px) rotateZ(-220deg);
+  }
+
+  75% {
+    transform: translateY(-22px) rotateZ(-260deg);
+  }
+
+  85% {
+    transform: translateY(-10px) rotateZ(-300deg);
+  }
+
+  95% {
+    transform: translateY(-8px) rotateZ(-330deg);
+  }
+
+  100% {
+    transform: translateY(0) rotateZ(-360deg);
+  }
+}
+
+.dice-cube-marker-animate-right {
+  --dice-cube-bounce-ease: cubic-bezier(0.33, 1.25, 0.45, 1);
+  animation: diceCubeMarkerBounceRight var(--dice-cube-animation-duration)
+    var(--dice-cube-bounce-ease);
+}
+
+.dice-cube-marker-animate-left {
+  --dice-cube-bounce-ease: cubic-bezier(0.33, 1.25, 0.45, 1);
+  animation: diceCubeMarkerBounceLeft var(--dice-cube-animation-duration)
+    var(--dice-cube-bounce-ease);
+}
+
+@keyframes diceCubeShadowBounce {
+  0% {
+    transform: scale(0.5);
+  }
+
+  35% {
+    transform: scale(1);
+  }
+
+  65% {
+    transform: scale(0.6);
+  }
+
+  75% {
+    transform: scale(0.7);
+  }
+
+  85% {
+    transform: scale(0.6);
+  }
+
+  95% {
+    transform: scale(0.55);
+  }
+
+  100% {
+    transform: scale(0.5);
+  }
+}
+
+.dice-cube-shadow-animate-right,
+.dice-cube-shadow-animate-left {
+  --dice-cube-bounce-ease: cubic-bezier(0.33, 1.25, 0.45, 1);
+  animation: diceCubeShadowBounce var(--dice-cube-animation-duration)
+    var(--dice-cube-bounce-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice-cube-travel-animate,
+  .dice-cube-marker-animate-right,
+  .dice-cube-marker-animate-left,
+  .dice-cube-shadow-animate-right,
+  .dice-cube-shadow-animate-left {
+    animation: none;
+    transition: none;
+  }
+}

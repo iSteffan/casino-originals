@@ -1,0 +1,17 @@
+@utility ds-dice-slider-track {
+  background-color: var(--ds-error-500);
+}
+
+@utility ds-dice-slider-range {
+  background-image: linear-gradient(to right, var(--ds-lime-300), var(--ds-white));
+}
+
+.ds-dice-slider[data-direction='OVER'] .ds-dice-slider-track {
+  background-color: transparent;
+  background-image: linear-gradient(to right, var(--ds-white), var(--ds-lime-300));
+}
+
+.ds-dice-slider[data-direction='OVER'] .ds-dice-slider-range {
+  background-image: none;
+  background-color: var(--ds-error-500);
+}

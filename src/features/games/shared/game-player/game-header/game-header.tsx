@@ -109,25 +109,22 @@ export function GameHeader({
   fairnessLabel = 'Provably fair',
   className,
 }: GameHeaderProps) {
-  const hasPrimaryActions = Boolean(
-    onFavoriteClick || onTheatreToggle || onFullscreenToggle,
-  );
-  const hasPersistentPrimaryActions = Boolean(onFavoriteClick || onFullscreenToggle);
-  const hasSecondaryActions = Boolean(
-    (showVolumeControl && onVolumeChange) || onFairnessClick,
-  );
-  const hasDesktopOnlyActions = Boolean(
-    onTheatreToggle && !hasPersistentPrimaryActions && !hasSecondaryActions,
+  const hasActions = Boolean(
+    onFavoriteClick ||
+      onTheatreToggle ||
+      onFullscreenToggle ||
+      onFairnessClick ||
+      (showVolumeControl && onVolumeChange),
   );
 
   return (
     <div
       className={cn(
-        'gap-ds-2 md:mb-ds-0 md:min-h-ds-14 mb-ds-4 flex flex-col items-center justify-between md:flex-row',
+        'gap-ds-2 md:mb-ds-0 md:min-h-ds-14 mb-ds-4 flex w-full flex-row items-center justify-between',
         className,
       )}
     >
-      <div className="gap-ds-4 mr-auto flex w-full min-w-0 flex-1 items-center md:w-auto">
+      <div className="gap-ds-4 flex min-w-0 flex-1 items-center">
         <div className="gap-ds-1 flex min-w-0 flex-initial items-center">
           <BackControl
             backHref={backHref}
@@ -148,109 +145,86 @@ export function GameHeader({
         {modeControl}
       </div>
 
-      {hasPrimaryActions || hasSecondaryActions ? (
-        <div
-          className={cn(
-            'gap-ds-4 flex w-full md:w-fit md:justify-end',
-            hasSecondaryActions && hasPersistentPrimaryActions
-              ? 'justify-between'
-              : 'justify-start md:justify-end',
-            hasDesktopOnlyActions && 'hidden lg:flex',
-          )}
-        >
-          {hasPrimaryActions ? (
-            <div
-              className={cn(
-                'gap-ds-1 flex',
-                !hasPersistentPrimaryActions && 'hidden lg:flex',
-              )}
-            >
-              {onFavoriteClick ? (
-                <Button
-                  type="button"
-                  variant="gray-muted"
-                  size="md"
-                  className="w-ds-8 px-ds-3 py-ds-2 md:w-fit"
-                  left={
-                    <Icon
-                      name={isFavorite ? 'favorites' : 'favorites-outline'}
-                      size="sm"
-                      color="white"
-                    />
-                  }
-                  loading={favoritePending}
-                  loadingLabel={favoriteLabel}
-                  onClick={onFavoriteClick}
-                  aria-label={favoriteLabel}
-                  aria-pressed={isFavorite}
-                >
-                  <span className="hidden md:block">
-                    <Typography kind="secondary-14-400" as="span">
-                      {favoriteLabel}
-                    </Typography>
-                  </span>
-                </Button>
-              ) : null}
-
-              {onTheatreToggle ? (
-                <TheatreButton
-                  isTheatreMode={isTheatreMode}
-                  onTheatreToggle={onTheatreToggle}
-                  aria-label={theatreLabel}
-                />
-              ) : null}
-
-              {onFullscreenToggle ? (
-                <Button
-                  type="button"
-                  variant={isFullscreen ? 'white' : 'gray-muted'}
-                  size="md"
-                  iconOnly
-                  disabled={fullscreenDisabled}
-                  aria-label={fullscreenLabel}
-                  aria-pressed={isFullscreen}
-                  onClick={onFullscreenToggle}
-                  className="w-ds-8"
-                >
-                  <Icon
-                    name="fullscreen"
-                    size="sm"
-                    color="none"
-                    className={
-                      fullscreenDisabled
-                        ? undefined
-                        : isFullscreen
-                          ? 'text-ds-black'
-                          : 'text-ds-white'
-                    }
-                  />
-                </Button>
-              ) : null}
-            </div>
+      {hasActions ? (
+        <div className="gap-ds-2 flex shrink-0 items-center justify-end">
+          {showVolumeControl && onVolumeChange ? (
+            <GamesVolume volume={volume} onVolumeChange={onVolumeChange} />
           ) : null}
 
-          {hasSecondaryActions ? (
-            <div className="gap-ds-4 flex">
-              {showVolumeControl && onVolumeChange && (
-                <div className="order-3 md:order-2">
-                  <GamesVolume volume={volume} onVolumeChange={onVolumeChange} />
-                </div>
-              )}
+          {onFairnessClick ? (
+            <Button
+              type="button"
+              variant="gray-muted"
+              size="md"
+              iconOnly
+              className="w-ds-8"
+              aria-label={fairnessLabel}
+              onClick={onFairnessClick}
+            >
+              <Icon name="safe-cert" size="sm" color="white" />
+            </Button>
+          ) : null}
 
-              {onFairnessClick ? (
-                <Button
-                  type="button"
-                  variant="gray-muted"
-                  size="md"
-                  iconOnly
-                  className="w-ds-8 order-2 md:order-3"
-                  aria-label={fairnessLabel}
-                  onClick={onFairnessClick}
-                >
-                  <Icon name="safe-cert" size="sm" color="white" />
-                </Button>
-              ) : null}
-            </div>
+          {onFavoriteClick ? (
+            <Button
+              type="button"
+              variant="gray-muted"
+              size="md"
+              className="w-ds-8 px-ds-3 py-ds-2 md:w-fit"
+              left={
+                <Icon
+                  name={isFavorite ? 'favorites' : 'favorites-outline'}
+                  size="sm"
+                  color="white"
+                />
+              }
+              loading={favoritePending}
+              loadingLabel={favoriteLabel}
+              onClick={onFavoriteClick}
+              aria-label={favoriteLabel}
+              aria-pressed={isFavorite}
+            >
+              <span className="hidden md:block">
+                <Typography kind="secondary-14-400" as="span">
+                  {favoriteLabel}
+                </Typography>
+              </span>
+            </Button>
+          ) : null}
+
+          {onTheatreToggle ? (
+            <TheatreButton
+              isTheatreMode={isTheatreMode}
+              onTheatreToggle={onTheatreToggle}
+              aria-label={theatreLabel}
+            />
+          ) : null}
+
+          {onFullscreenToggle ? (
+            <Button
+              type="button"
+              variant={isFullscreen ? 'white' : 'gray-muted'}
+              size="md"
+              iconOnly
+              disabled={fullscreenDisabled}
+              aria-label={fullscreenLabel}
+              aria-pressed={isFullscreen}
+              onClick={onFullscreenToggle}
+              className="w-ds-8"
+            >
+              <Icon
+                name="fullscreen"
+                size="sm"
+                color="none"
+                className={
+                  fullscreenDisabled
+                    ? undefined
+                    : isFullscreen
+                      ? 'text-ds-black'
+                      : 'text-ds-white'
+                }
+              />
+            </Button>
           ) : null}
         </div>
       ) : null}

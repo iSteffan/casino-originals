@@ -1,0 +1,16 @@
+@utility ds-dice-controls-action {
+  height: var(--ds-spacing-6);
+  width: var(--ds-spacing-6);
+  min-height: var(--ds-spacing-6);
+  min-width: var(--ds-spacing-6);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.ds-dice-controls-action:not(:disabled):hover {
+  color: var(--color-ds-button-link-white-hover-text);
+}
+
+.ds-dice-controls-action:not(:disabled):hover svg {
+  color: var(--color-ds-button-link-white-hover-icon);
+}
