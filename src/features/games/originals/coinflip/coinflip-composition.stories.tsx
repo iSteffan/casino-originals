@@ -310,7 +310,7 @@ const defaultArgs = {
   tabsDisabled: false,
   fieldsDisabled: false,
   betAmountLoading: false,
-  betAmount: '1000.00',
+  betAmount: '1.00',
   side: 'HEADS',
   reducedMotion: false,
   turboMode: false,
@@ -342,7 +342,7 @@ const defaultArgs = {
   lastResults: coinflipStoryLastResults,
   showWinModal: false,
   winMultiplier: 'x2.00',
-  winAmount: '2,000.00',
+  winAmount: '2.00',
 } satisfies PlaygroundArgs;
 
 const meta = {

@@ -190,7 +190,7 @@ const defaultArgs = {
   tabsDisabled: false,
   fieldsDisabled: false,
   betAmountLoading: false,
-  betAmount: '1000.00',
+  betAmount: '1.00',
   direction: 'UNDER',
   displayValue: initialLinked.displayValue,
   winChance: initialLinked.winChance,

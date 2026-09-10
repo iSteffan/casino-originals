@@ -36,7 +36,7 @@ const baseShell = {
 } satisfies CoinflipConfigProps['shell'];
 
 const baseBetAmount = {
-  value: '1000.00',
+  value: '1.00',
   onChange: noop,
   conversionText: '0.000145 BTC',
   tooltip: coinflipStoryBetAmountTooltip,

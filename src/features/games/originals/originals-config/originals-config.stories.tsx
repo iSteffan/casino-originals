@@ -94,7 +94,7 @@ function OriginalsConfigPlayground({
   autobetWinRate = '0%',
 }: PlaygroundArgs) {
   const [mode, setMode] = useState<OriginalsConfigMode>(modeArg);
-  const [betAmount, setBetAmount] = useState('1000.00');
+  const [betAmount, setBetAmount] = useState('1.00');
   const [rounds, setRounds] = useState('100');
   const [isActiveOnWin, setIsActiveOnWin] = useState(false);
   const [isActiveOnLoss, setIsActiveOnLoss] = useState(false);

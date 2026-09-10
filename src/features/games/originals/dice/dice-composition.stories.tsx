@@ -377,7 +377,7 @@ const defaultArgs = {
   tabsDisabled: false,
   fieldsDisabled: false,
   betAmountLoading: false,
-  betAmount: '1000.00',
+  betAmount: '1.00',
   direction: 'UNDER',
   displayValue: initialLinked.displayValue,
   winChance: initialLinked.winChance,
@@ -416,7 +416,7 @@ const defaultArgs = {
   lastResults: diceStoryLastResults,
   showWinModal: false,
   winMultiplier: 'x1.96',
-  winAmount: '1,960.00',
+  winAmount: '1.96',
 } satisfies PlaygroundArgs;
 
 const meta = {

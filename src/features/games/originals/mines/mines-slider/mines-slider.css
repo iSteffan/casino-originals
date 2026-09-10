@@ -1,0 +1,49 @@
+@utility ds-mines-slider-indicator {
+  display: flex;
+  height: var(--ds-spacing-9);
+  width: 3.0625rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-spacing-1);
+  border-radius: var(--radius-ds-2xs);
+  background-color: var(--ds-gray-800);
+}
+
+@utility ds-mines-slider-value {
+  width: 1rem;
+  text-align: center;
+  font-size: var(--ds-text-body-lg);
+  line-height: var(--ds-leading-body-lg);
+  letter-spacing: var(--ds-tracking-body-lg);
+  font-weight: var(--ds-font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--ds-white);
+}
+
+@utility ds-mines-slider-track {
+  background-color: var(--ds-error-500);
+}
+
+@utility ds-mines-slider-unfilled {
+  pointer-events: none;
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: calc(var(--slider-segment-percent, 100%) + 1px);
+  background:
+    linear-gradient(
+      270deg,
+      var(--ds-gray-800) 30%,
+      color-mix(in srgb, var(--ds-gray-800) 80%, transparent) 90%
+    ),
+    var(--ds-lime-300);
+}
+
+@utility ds-mines-slider-range {
+  background: linear-gradient(
+    270deg,
+    color-mix(in srgb, var(--ds-gray-800) 80%, transparent) 10%,
+    var(--ds-gray-800) 70%
+  );
+}

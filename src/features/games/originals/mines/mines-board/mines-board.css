@@ -1,0 +1,13 @@
+@media (min-width: 1024px) and (max-height: 640px) {
+  .ds-mines-board-theatre .ds-mines-board-theatre-content {
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .ds-mines-board-theatre .ds-mines-grid-theatre {
+    height: auto;
+    max-height: none;
+    max-width: min(100%, 37.3125rem);
+  }
+}

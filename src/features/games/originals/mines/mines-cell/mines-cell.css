@@ -1,0 +1,87 @@
+@utility ds-mines-cell-perspective {
+  container-type: inline-size;
+  perspective: 28rem;
+  perspective-origin: center center;
+}
+
+@utility ds-mines-cell-cashout {
+  & [data-slot='typography'] {
+    font-size: min(var(--ds-text-body-md), 22cqw);
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+@utility ds-mines-cell-flipper {
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(0deg);
+}
+
+@utility ds-mines-cell-flipper-revealed {
+  transform: rotateX(180deg);
+}
+
+@utility ds-mines-cell-flipper-animating {
+  transition: transform var(--ds-duration-fast) linear;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility ds-mines-cell-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+@utility ds-mines-cell-face-back {
+  transform: rotateX(180deg) translateZ(0);
+}
+
+@utility ds-mines-cell-hover-shadow {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      filter: drop-shadow(
+        0 8px 10px color-mix(in srgb, var(--ds-purple-500) 80%, transparent)
+      );
+    }
+  }
+}
+
+@utility ds-mines-cell-hover-ring {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-image: linear-gradient(
+        to bottom,
+        var(--ds-black),
+        color-mix(in srgb, var(--ds-purple-300) 70%, var(--ds-purple-500))
+      );
+    }
+  }
+}
+
+@utility ds-mines-cell-logo-glow {
+  background-color: var(--ds-lime-300);
+  filter: blur(6px);
+  opacity: 0.55;
+}
+
+@utility ds-mines-cell-logo-hint {
+  opacity: 0;
+  transition: opacity var(--ds-duration-instant) var(--ds-ease-standard);
+
+  @media (hover: hover) and (pointer: fine) {
+    .group:hover & {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
