@@ -11,6 +11,9 @@
 @import './features/games/originals/mines/mines-board/mines-board.css';
 @import './features/games/originals/mines/mines-cell/mines-cell.css';
 @import './features/games/originals/mines/mines-slider/mines-slider.css';
+@import './features/games/originals/keno/keno-board/keno-board.css';
+@import './features/games/originals/keno/keno-cell/keno-cell.css';
+@import './features/games/originals/keno/keno-paytable/keno-paytable.css';
 @import './features/games/originals/shared/autobet-session-status/autobet-session-status.css';
 @import './features/games/originals/shared/bet-amount-input/bet-amount-input.css';
 @import './features/games/originals/shared/game-win-modal/game-win-modal.css';

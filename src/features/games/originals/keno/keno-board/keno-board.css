@@ -1,0 +1,20 @@
+@utility ds-keno-surface-max {
+  max-width: 35rem;
+}
+
+@utility ds-keno-board-theatre-frame {
+  /* Size CQ needs a definite height; that exists only in desktop theatre (`lg:h-full`). */
+  @media (width >= 64rem) {
+    container-type: size;
+  }
+}
+
+@utility ds-keno-board-theatre-stack {
+  width: 100%;
+  max-width: 100%;
+
+  @media (width >= 64rem) {
+    max-height: 100%;
+    width: clamp(0rem, calc((100cqh - 3.75rem - var(--ds-spacing-6)) * 8 / 5), 100cqw);
+  }
+}

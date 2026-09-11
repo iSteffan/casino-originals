@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useArgs, useRef } from 'storybook/preview-api';
+import { useArgs, useEffect, useRef } from 'storybook/preview-api';
 
 import { DiceBoard } from './dice-board';
 import type { DiceBoardDirection, DiceResultAnnouncement } from './dice-board.types';

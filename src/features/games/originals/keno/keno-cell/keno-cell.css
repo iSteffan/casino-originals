@@ -1,0 +1,115 @@
+@utility ds-keno-cell-perspective {
+  perspective: 28rem;
+  perspective-origin: center center;
+  container-type: inline-size;
+}
+
+@utility ds-keno-cell-flipper {
+  position: relative;
+  transform-origin: center center;
+  transform-style: preserve-3d;
+  transform: rotateX(0deg) translateZ(0);
+}
+
+@keyframes ds-keno-cell-flip {
+  0% {
+    transform: rotateX(0deg) translateZ(0);
+  }
+  50% {
+    transform: rotateX(90deg) translateZ(0);
+  }
+  100% {
+    transform: rotateX(0deg) translateZ(0);
+  }
+}
+
+@keyframes ds-keno-cell-face-hide {
+  0% {
+    opacity: 1;
+    animation-timing-function: step-end;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ds-keno-cell-face-show {
+  0% {
+    opacity: 0;
+    animation-timing-function: step-end;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@utility ds-keno-cell-flip-animating {
+  animation: ds-keno-cell-flip var(--ds-duration-fast) linear forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility ds-keno-cell-face-layer {
+  position: absolute;
+  inset: 0;
+}
+
+@utility ds-keno-cell-face-outgoing {
+  animation: ds-keno-cell-face-hide var(--ds-duration-fast) linear forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility ds-keno-cell-face-incoming {
+  opacity: 0;
+  animation: ds-keno-cell-face-show var(--ds-duration-fast) linear forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@utility ds-keno-cell-number-raised {
+  /* Optical alignment on idle/selected face art */
+  top: 18%;
+}
+
+@utility ds-keno-cell-number {
+  pointer-events: none;
+  user-select: none;
+  text-align: center;
+  font-family: var(--font-ds-display);
+  font-size: clamp(var(--ds-text-body-sm), 36cqw, var(--ds-text-display-lg));
+  font-style: normal;
+  font-weight: var(--ds-font-weight-bold);
+  line-height: var(--ds-leading-display-lg);
+  letter-spacing: var(--ds-tracking-display-lg);
+  text-shadow: 0 2px 0 var(--color-ds-black);
+}
+
+@utility ds-keno-cell-shadow {
+  filter: drop-shadow(
+    0 4px 6px color-mix(in srgb, var(--ds-purple-500) 80%, transparent)
+  );
+}
+
+@utility ds-keno-cell-hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      filter: drop-shadow(
+        0 4px 6px color-mix(in srgb, var(--ds-purple-500) 80%, transparent)
+      );
+    }
+  }
+}

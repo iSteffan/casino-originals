@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useArgs, useRef } from 'storybook/preview-api';
+import { useArgs, useEffect, useRef } from 'storybook/preview-api';
 
 import { DiceCube } from './dice-cube';
 import type { DiceCubeAnimationDirection, DiceCubeMarkerState } from './dice-cube.types';

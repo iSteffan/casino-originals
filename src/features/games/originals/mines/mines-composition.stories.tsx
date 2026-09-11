@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
-
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useArgs } from 'storybook/preview-api';
+import { useArgs, useEffect, useRef } from 'storybook/preview-api';
 
 import { MinesBoard } from '#ui/features/games/originals/mines/mines-board/mines-board';
 import type { MinesBoardProps } from '#ui/features/games/originals/mines/mines-board/mines-board.types';
@@ -105,7 +103,7 @@ function MinesCompositionStory() {
   const focusFirstCellOnManualStartRef = useRef(false);
   const reducedMotion = args.reducedMotion || shouldReduceMotion();
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (
       !focusFirstCellOnManualStartRef.current ||
       !args.roundActive ||

@@ -1,0 +1,42 @@
+@utility ds-keno-paytable {
+  --ds-keno-paytable-font-size: 7px;
+  --ds-keno-paytable-letter-spacing: 0.142px;
+  --ds-keno-paytable-icon-size: var(--ds-spacing-2);
+  --ds-keno-paytable-height: 3rem;
+
+  height: var(--ds-keno-paytable-height);
+
+  @media (width >= 40rem) {
+    --ds-keno-paytable-font-size: var(--ds-text-body-md);
+    --ds-keno-paytable-letter-spacing: var(--ds-tracking-body-md);
+  }
+
+  @media (width >= 48rem) {
+    --ds-keno-paytable-icon-size: var(--ds-spacing-3);
+  }
+}
+
+@utility ds-keno-paytable-theatre {
+  --ds-keno-paytable-height: 3.75rem;
+}
+
+@utility ds-keno-paytable-label {
+  font-size: var(--ds-keno-paytable-font-size);
+  line-height: var(--ds-leading-body-md);
+  letter-spacing: var(--ds-keno-paytable-letter-spacing);
+}
+
+@utility ds-keno-paytable-hits-icon {
+  display: block;
+  width: var(--ds-keno-paytable-icon-size);
+  height: var(--ds-keno-paytable-icon-size);
+  background-color: currentColor;
+  mask-image: var(--ds-keno-paytable-hits-icon);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-image: var(--ds-keno-paytable-hits-icon);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
