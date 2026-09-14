@@ -1,0 +1,147 @@
+@utility ds-towers-grid {
+  --towers-gap: 4px;
+  --towers-row-gap: 8px;
+  --towers-pad-y: 32px;
+  --towers-multiplier: 52px;
+  --towers-multiplier-min-h: 20px;
+  --towers-cell-width: 148px;
+  --towers-cell-height: 40px;
+  --towers-cols: 3;
+  --towers-rows: 10;
+  --towers-natural-width: calc(
+    var(--towers-multiplier) + var(--towers-row-gap) +
+      (var(--towers-cols) * var(--towers-cell-width)) +
+      ((var(--towers-cols) - 1) * var(--towers-gap))
+  );
+  --towers-natural-height: calc(
+    var(--towers-rows) * var(--towers-cell-height) + (var(--towers-rows) - 1) *
+      var(--towers-gap) + var(--towers-pad-y)
+  );
+  width: 100%;
+  min-width: 0;
+  max-width: var(--towers-natural-width);
+}
+
+@media (max-width: 559px) {
+  .ds-towers-grid:not(.ds-towers-grid-theatre) {
+    --towers-cell-width: 81px;
+    --towers-cell-height: 40px;
+  }
+
+  .ds-towers-grid:not(.ds-towers-grid-theatre) .ds-towers-cell-perspective {
+    aspect-ratio: 81 / 40;
+  }
+}
+
+@utility ds-towers-grid-theatre {
+  min-height: 280px;
+  max-width: none;
+
+  @media (min-width: 1024px) {
+    container: towers-board / size;
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+@layer utilities {
+  .ds-towers-grid.ds-towers-grid-theatre {
+    --towers-multiplier: 62px;
+    --towers-cell-width: 222px;
+    --towers-cell-height: 60px;
+    --towers-multiplier-min-h: 25px;
+    max-width: none;
+  }
+
+  .ds-towers-grid.ds-towers-grid-theatre .ds-towers-grid-stack {
+    width: min(100%, var(--towers-natural-width));
+    max-height: 100%;
+  }
+
+  .ds-towers-grid.ds-towers-grid-theatre .ds-towers-cell-perspective {
+    aspect-ratio: 37 / 10;
+  }
+
+  @media (min-width: 1024px) {
+    .ds-towers-grid.ds-towers-grid-theatre .ds-towers-grid-stack {
+      max-height: none;
+      /* cqh can be 0 before the board container gets a definite height; keep a width floor. */
+      width: max(
+        min(
+          100cqw,
+          var(--towers-natural-width),
+          calc(var(--towers-natural-width) / var(--towers-natural-height) * 100cqh)
+        ),
+        min(100cqw, var(--towers-natural-width))
+      );
+    }
+  }
+}
+
+@utility ds-towers-grid-viewport {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+@utility ds-towers-grid-stack {
+  display: flex;
+  width: min(100%, var(--towers-natural-width));
+  max-height: 100%;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: var(--towers-gap);
+  padding-block: 16px;
+}
+
+@utility ds-towers-grid-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: var(--towers-multiplier) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--towers-row-gap);
+  white-space: nowrap;
+}
+
+@utility ds-towers-grid-cells {
+  display: grid;
+  min-width: 0;
+  gap: var(--towers-gap);
+  grid-template-columns: repeat(var(--towers-cols), minmax(0, 1fr));
+}
+
+@utility ds-towers-multiplier {
+  display: flex;
+  width: var(--towers-multiplier);
+  height: max(var(--towers-multiplier-min-h), 50%);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  border-radius: var(--ds-radius-2xs);
+  transition:
+    background-color var(--ds-duration-slow),
+    color var(--ds-duration-slow);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility ds-towers-multiplier-active {
+  background-color: var(--ds-purple-500);
+  color: var(--ds-white);
+}
+
+@utility ds-towers-multiplier-passed {
+  background-color: var(--ds-purple-800);
+  color: var(--ds-gray-600);
+}
+
+@utility ds-towers-multiplier-upcoming {
+  background-color: var(--ds-gray-950);
+  color: var(--ds-gray-600);
+}

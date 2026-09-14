@@ -1,0 +1,30 @@
+<svg width="82" height="40" viewBox="0 0 82 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_n_6475_12927)">
+<rect width="81.3333" height="40" rx="6" fill="black"/>
+<rect width="81.3333" height="40" rx="6" fill="url(#paint0_radial_6475_12927)" fill-opacity="0.15"/>
+<path d="M38.2675 19.5189C38.344 19.6229 38.465 19.6842 38.5938 19.6842H51.6988C51.8944 19.6842 52.0621 19.5441 52.0976 19.351L52.9929 14.481C53.0389 14.2308 52.8476 14 52.5942 14H35.0124C34.6797 14 34.4885 14.3802 34.6862 14.6489L38.2675 19.5189Z" fill="#331515"/>
+<path d="M42.1029 20.4811C42.0265 20.3771 41.9054 20.3158 41.7767 20.3158L29.3007 20.3158C29.1051 20.3158 28.9375 20.4559 28.902 20.649L28.0066 25.519C27.9606 25.7692 28.1519 26 28.4054 26H45.3581C45.6908 26 45.8819 25.6198 45.6843 25.3511L42.1029 20.4811Z" fill="#331515"/>
+</g>
+<defs>
+<filter id="filter0_n_6475_12927" x="0" y="0" width="81.3333" height="40" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feTurbulence type="fractalNoise" baseFrequency="1 1" stitchTiles="stitch" numOctaves="3" result="noise" seed="6069" />
+<feColorMatrix in="noise" type="luminanceToAlpha" result="alphaNoise" />
+<feComponentTransfer in="alphaNoise" result="coloredNoise1">
+<feFuncA type="discrete" tableValues="1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "/>
+</feComponentTransfer>
+<feComposite operator="in" in2="shape" in="coloredNoise1" result="noise1Clipped" />
+<feFlood flood-color="rgba(0, 0, 0, 0.1)" result="color1Flood" />
+<feComposite operator="in" in2="noise1Clipped" in="color1Flood" result="color1" />
+<feMerge result="effect1_noise_6475_12927">
+<feMergeNode in="shape" />
+<feMergeNode in="color1" />
+</feMerge>
+</filter>
+<radialGradient id="paint0_radial_6475_12927" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(41.0142 20.1709) rotate(90) scale(19.8291 24.7361)">
+<stop stop-color="#FF6B6B"/>
+<stop offset="1" stop-color="#FF6B6B" stop-opacity="0"/>
+</radialGradient>
+</defs>
+</svg>

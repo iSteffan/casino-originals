@@ -1,0 +1,186 @@
+@utility ds-towers-cell-frame-desktop {
+  --towers-cell-width: 148px;
+  --towers-cell-height: 40px;
+  width: var(--towers-cell-width);
+}
+
+@utility ds-towers-cell-frame-compact {
+  --towers-cell-width: 81px;
+  --towers-cell-height: 40px;
+  width: var(--towers-cell-width);
+}
+
+@utility ds-towers-cell-frame-theatre {
+  --towers-cell-width: 222px;
+  --towers-cell-height: 60px;
+  width: var(--towers-cell-width);
+}
+
+@utility ds-towers-cell-perspective {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  aspect-ratio: 37 / 10;
+  perspective: 28rem;
+  perspective-origin: center center;
+}
+
+@utility ds-towers-cell-shell {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform var(--ds-duration-base) var(--ds-ease-standard);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility ds-towers-cell-flipper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+  transform-style: flat;
+  backface-visibility: hidden;
+  transform: rotateX(0deg);
+}
+
+@keyframes ds-towers-cell-flip-out {
+  0% {
+    transform: rotateX(0deg);
+  }
+  100% {
+    transform: rotateX(90deg);
+  }
+}
+
+@keyframes ds-towers-cell-flip-in {
+  0% {
+    transform: rotateX(90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+@utility ds-towers-cell-flip-out {
+  animation: ds-towers-cell-flip-out var(--ds-towers-cell-half-flip-duration) linear both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility ds-towers-cell-flip-in {
+  animation: ds-towers-cell-flip-in var(--ds-towers-cell-half-flip-duration) linear both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility ds-towers-cell-face-art {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  object-position: left top;
+}
+
+@utility ds-towers-cell-shadow {
+  filter: drop-shadow(
+    0 4px 6px color-mix(in srgb, var(--ds-purple-500) 80%, transparent)
+  );
+}
+
+@utility ds-towers-cell-auto-mark {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--ds-radius-2xs);
+  border: 1px solid var(--ds-purple-500);
+  background-color: color-mix(in srgb, var(--ds-purple-300) 20%, transparent);
+}
+
+@utility ds-towers-cell-auto-mark-planned {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--ds-radius-2xs);
+  border: 2px solid var(--ds-purple-500);
+  background-color: color-mix(in srgb, var(--ds-purple-300) 18%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ds-purple-500) 25%, transparent);
+}
+
+@utility ds-towers-cell-auto-mark-active {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--ds-radius-2xs);
+  border: 2px solid var(--ds-purple-500);
+  background-color: color-mix(in srgb, var(--ds-purple-300) 12%, transparent);
+}
+
+@utility ds-towers-cell-auto-selectable {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ds-towers-cell-auto-pulse calc(var(--ds-duration-slower) * 4)
+      var(--ds-ease-standard) infinite;
+  }
+}
+
+@utility ds-towers-cell-selectable-hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: scale(1.05);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+@utility ds-towers-cell-shell-flipping {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+@keyframes ds-towers-cell-auto-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@utility ds-towers-cell-label {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--ds-spacing-1);
+}
+
+@utility ds-towers-cell-label-copy {
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
