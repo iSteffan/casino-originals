@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { Providers } from './providers';
+import { AppHeaderShell } from '#ui/layouts/app-header/app-header-shell';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,7 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <AppHeaderShell>{children}</AppHeaderShell>
+        </Providers>
       </body>
     </html>
   );

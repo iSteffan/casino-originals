@@ -1,4 +1,5 @@
 /** Component styles required by originals shared UI. */
+@import './features/cashier/cashier-dropdown/cashier-dropdown.css';
 @import './features/games/originals/originals-config/originals-config.css';
 @import './features/games/originals/coinflip/coinflip.tokens.css';
 @import './features/games/originals/coinflip/coinflip-last-results/coinflip-last-results.css';
@@ -26,8 +27,10 @@
 @import './features/games/originals/shared/stop-conditions/stop-conditions.css';
 @import './features/games/originals/shared/turbo-mode/turbo-mode.css';
 @import './features/games/shared/game-player/games-volume/games-volume.css';
+@import './layouts/app-header/app-header.css';
 @import './lib/animations.css';
 @import './lib/overlay.css';
 @import './primitives/actions/button/button.css';
 @import './primitives/data-display/gradient-card/gradient-card.css';
+@import './primitives/data-display/swap-transition/swap-transition.css';
 @import './primitives/navigation/tabs/tabs.css';

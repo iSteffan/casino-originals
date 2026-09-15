@@ -10,6 +10,8 @@ import { definePreview } from '@storybook/nextjs-vite';
 import { themes } from 'storybook/theming';
 import pseudoStates from 'storybook-addon-pseudo-states';
 
+import { AppHeaderShell } from '#ui/layouts/app-header/app-header-shell';
+
 if (typeof document !== 'undefined') {
   document.body.setAttribute('data-ds-motion-root', '');
 }
@@ -37,16 +39,31 @@ function withNextIntl(Story: ComponentType) {
   );
 }
 
+function withAppHeader(
+  Story: ComponentType,
+  context?: { viewMode?: string; parameters?: { appHeader?: boolean } },
+) {
+  if (context?.viewMode === 'docs' || context?.parameters?.appHeader === false) {
+    return <Story />;
+  }
+
+  return (
+    <AppHeaderShell>
+      <Story />
+    </AppHeaderShell>
+  );
+}
+
 export default definePreview({
   addons: [addonDocs(), pseudoStates()],
-  decorators: [withNextIntl],
+  decorators: [withNextIntl, withAppHeader],
   initialGlobals: {
     backgrounds: { value: 'dark' },
   },
   parameters: {
     options: {
       storySort: {
-        order: ['Features', ['Games', ['Originals']]],
+        order: ['Layout', 'Features', ['Games', ['Originals'], 'Cashier']],
       },
     },
     docs: {

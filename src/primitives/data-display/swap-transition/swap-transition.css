@@ -1,0 +1,13 @@
+[data-slot='swap-transition'] {
+  display: grid;
+  grid-template-areas: 'stack';
+}
+
+[data-slot='swap-transition-layer'] {
+  grid-area: stack;
+  min-width: 0;
+}
+
+[data-slot='swap-transition-layer'][data-swap='out'] {
+  pointer-events: none;
+}

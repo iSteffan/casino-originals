@@ -1,0 +1,82 @@
+.ds-cashier {
+  width: 9.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--ds-radius-xs);
+  background:
+    radial-gradient(
+        35.21% 100% at 0% 100%,
+        color-mix(in srgb, var(--color-ds-purple-400) 20%, transparent) 0%,
+        transparent 100%
+      )
+      padding-box,
+    linear-gradient(var(--color-ds-gray-900), var(--color-ds-gray-900)) padding-box,
+    linear-gradient(
+        to right,
+        color-mix(in srgb, var(--color-ds-purple-400) 55%, transparent),
+        var(--color-ds-border-tertiary)
+      )
+      border-box;
+}
+
+.ds-cashier-icon-shadow {
+  box-shadow: 0 2px 8px 0
+    color-mix(in srgb, var(--color-ds-brand-primary) 50%, transparent);
+}
+
+.ds-cashier-amount {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ds-cashier-amount-value {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ds-cashier-amount[data-truncated] .ds-cashier-amount-value {
+  padding-right: 0.75em;
+}
+
+.ds-cashier-amount-ellipsis {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 0.25rem;
+  background: var(--color-ds-gray-900);
+  color: var(--color-ds-text-tertiary);
+  pointer-events: none;
+}
+
+[data-slot='cashier-affix'] {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+[data-slot='cashier-affix-clip'] {
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-width var(--ds-duration-base) var(--ds-ease-emphasized),
+    opacity var(--ds-duration-base) var(--ds-ease-entrance);
+}
+
+[data-slot='cashier-affix'][data-open] [data-slot='cashier-affix-clip'] {
+  max-width: 1em;
+  opacity: 1;
+}
+
+[data-slot='cashier-affix-value'] {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='cashier-affix-clip'] {
+    transition: none;
+  }
+}
