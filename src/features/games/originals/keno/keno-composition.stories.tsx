@@ -44,6 +44,7 @@ import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-
 import type { AutobetSessionState } from '#ui/features/games/originals/shared/autobet-session-status/autobet-session-status.types';
 import { GameWinModal } from '#ui/features/games/originals/shared/game-win-modal/game-win-modal';
 import { GameHeader } from '#ui/features/games/shared/game-player/game-header/game-header';
+import { TheatreModeSync } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 
@@ -356,6 +357,10 @@ function KenoCompositionStory() {
           : !args.previewHeight && 'min-h-screen',
       )}
     >
+      <TheatreModeSync
+        theatreMode={args.theatreMode}
+        onExitTheatre={() => updateArgs({ theatreMode: false })}
+      />
       <div
         className={cn(
           'mx-auto flex w-full min-w-0 flex-col',

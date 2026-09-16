@@ -1,0 +1,7 @@
+@utility ds-game-card-scrim {
+  background-image: linear-gradient(
+    to top,
+    var(--ds-purple-500) 30%,
+    rgb(from var(--ds-purple-500) r g b / 0) 100%
+  );
+}

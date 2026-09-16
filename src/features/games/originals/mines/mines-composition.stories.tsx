@@ -41,6 +41,7 @@ import type {
   OriginalsConfigAutoActionVariant,
   OriginalsConfigMode,
 } from '#ui/features/games/originals/originals-config/originals-config.types';
+import { TheatreModeSync } from '#ui/layouts/app-header/app-layout-provider';
 import { resolveOriginalsAutobetAction } from '#ui/features/games/originals/originals-config/originals-config-autobet.utils';
 import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-shell/originals-game-shell';
 import type { AutobetSessionState } from '#ui/features/games/originals/shared/autobet-session-status/autobet-session-status.types';
@@ -681,6 +682,10 @@ function MinesCompositionStory() {
         args.theatreMode ? 'h-dvh' : 'min-h-screen',
       )}
     >
+      <TheatreModeSync
+        theatreMode={args.theatreMode}
+        onExitTheatre={() => updateArgs({ theatreMode: false })}
+      />
       <div
         className={cn(
           'mx-auto flex w-full min-w-0 flex-col',

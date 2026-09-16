@@ -28,6 +28,9 @@
 @import './features/games/originals/shared/turbo-mode/turbo-mode.css';
 @import './features/games/shared/game-player/games-volume/games-volume.css';
 @import './layouts/app-header/app-header.css';
+@import './layouts/app-sidebar/app-sidebar.css';
+@import './layouts/side-menu/side-menu-game-list.css';
+@import './features/games/shared/game-card/game-card.css';
 @import './lib/animations.css';
 @import './lib/overlay.css';
 @import './primitives/actions/button/button.css';

@@ -44,6 +44,7 @@ import {
   towersStoryWinCurrencyIcon,
 } from '#ui/features/games/originals/towers/towers-story-helpers';
 import { GameHeader } from '#ui/features/games/shared/game-player/game-header/game-header';
+import { TheatreModeSync } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 
@@ -452,6 +453,10 @@ function TowersCompositionStory() {
           : !args.previewHeight && 'min-h-screen',
       )}
     >
+      <TheatreModeSync
+        theatreMode={args.theatreMode}
+        onExitTheatre={() => updateArgs({ theatreMode: false })}
+      />
       <div
         className={cn(
           'mx-auto flex w-full min-w-0 flex-col',

@@ -11,6 +11,7 @@ import { themes } from 'storybook/theming';
 import pseudoStates from 'storybook-addon-pseudo-states';
 
 import { AppHeaderShell } from '#ui/layouts/app-header/app-header-shell';
+import { getAppSidebarActiveHref } from '#ui/layouts/app-sidebar/app-sidebar-games';
 
 if (typeof document !== 'undefined') {
   document.body.setAttribute('data-ds-motion-root', '');
@@ -41,14 +42,18 @@ function withNextIntl(Story: ComponentType) {
 
 function withAppHeader(
   Story: ComponentType,
-  context?: { viewMode?: string; parameters?: { appHeader?: boolean } },
+  context?: {
+    viewMode?: string;
+    id?: string;
+    parameters?: { appHeader?: boolean };
+  },
 ) {
   if (context?.viewMode === 'docs' || context?.parameters?.appHeader === false) {
     return <Story />;
   }
 
   return (
-    <AppHeaderShell>
+    <AppHeaderShell activeGameHref={getAppSidebarActiveHref(context?.id)}>
       <Story />
     </AppHeaderShell>
   );

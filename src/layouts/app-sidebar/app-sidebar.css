@@ -1,0 +1,122 @@
+.ds-app-sidebar {
+  position: relative;
+  display: none;
+  width: 4rem;
+  max-width: 4rem;
+  min-width: 0;
+  flex: none;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--color-ds-surface-primary);
+  border-right: 1px solid var(--color-ds-border-tertiary);
+  transition:
+    width var(--ds-duration-slow) var(--ds-ease-standard),
+    max-width var(--ds-duration-slow) var(--ds-ease-standard);
+}
+
+.ds-app-sidebar[data-expanded] {
+  width: 18rem;
+  max-width: 18rem;
+}
+
+.ds-app-sidebar-content {
+  display: flex;
+  width: 18rem;
+  flex-direction: column;
+  gap: var(--ds-spacing-2);
+  padding: var(--ds-spacing-3);
+}
+
+.ds-app-sidebar-toolbar {
+  min-height: var(--ds-spacing-9);
+}
+
+.ds-app-sidebar-games {
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--ds-duration-slow) var(--ds-ease-standard),
+    visibility var(--ds-duration-slow) var(--ds-ease-standard);
+}
+
+.ds-app-sidebar[data-expanded] .ds-app-sidebar-games {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.ds-app-sidebar-toggle {
+  position: absolute;
+  z-index: 10;
+  top: var(--ds-spacing-3);
+  right: 50%;
+  display: none;
+  color: var(--color-ds-icon-secondary);
+  background-color: var(--color-ds-surface-primary);
+  translate: 50% 0;
+  transition:
+    right var(--ds-duration-slow) var(--ds-ease-standard),
+    translate var(--ds-duration-slow) var(--ds-ease-standard);
+}
+
+.ds-app-sidebar[data-expanded] .ds-app-sidebar-toggle {
+  right: var(--ds-spacing-3);
+  translate: 0;
+}
+
+.ds-app-sidebar-toggle-icon {
+  position: relative;
+  width: var(--ds-spacing-5);
+  height: var(--ds-spacing-5);
+}
+
+.ds-app-sidebar-toggle-icon > [data-slot='icon'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition:
+    opacity var(--ds-duration-base) var(--ds-ease-standard),
+    scale var(--ds-duration-base) var(--ds-ease-standard);
+}
+
+.ds-app-sidebar-toggle-icon-expanded {
+  opacity: 0;
+  scale: 0.9;
+}
+
+.ds-app-sidebar-toggle-icon-collapsed {
+  opacity: 1;
+  scale: 1;
+}
+
+.ds-app-sidebar[data-expanded] .ds-app-sidebar-toggle-icon-expanded {
+  opacity: 1;
+  scale: 1;
+}
+
+.ds-app-sidebar[data-expanded] .ds-app-sidebar-toggle-icon-collapsed {
+  opacity: 0;
+  scale: 0.9;
+}
+
+@media (width >= 64rem) {
+  .ds-app-sidebar {
+    display: flex;
+  }
+
+  .ds-app-sidebar-toggle {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-app-sidebar,
+  .ds-app-sidebar-games,
+  .ds-app-sidebar-toggle,
+  .ds-app-sidebar-toggle-icon > [data-slot='icon'] {
+    transition: none;
+  }
+}

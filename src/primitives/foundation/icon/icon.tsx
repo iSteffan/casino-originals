@@ -14,6 +14,7 @@ import { ChevronRightIcon } from './icons/chevron-right';
 import { CircleIcon } from './icons/circle';
 import { ClockIcon } from './icons/clock';
 import { CloseIcon } from './icons/close';
+import { CoinflipIcon } from './icons/coinflip';
 import { CopyIcon } from './icons/copy';
 import { DangerIcon } from './icons/danger';
 import { DiceIcon } from './icons/dice';
@@ -29,12 +30,14 @@ import { ImageIcon } from './icons/image';
 import { InfiniteIcon } from './icons/infinite';
 import { InfoIcon } from './icons/info';
 import { InstagramIcon } from './icons/instagram';
+import { KenoIcon } from './icons/keno';
 import { LinkIcon } from './icons/link';
 import { LiveIcon } from './icons/live';
 import { LiveCasinoCardsIcon } from './icons/live-casino-cards';
 import { LoadingIcon } from './icons/loading';
 import { LockIcon } from './icons/lock';
 import { MailIcon } from './icons/mail';
+import { MinesIcon } from './icons/mines';
 import { MinusIcon } from './icons/minus';
 import { MuteIcon } from './icons/mute';
 import { MyBetsIcon } from './icons/my-bets';
@@ -50,6 +53,7 @@ import { SendIcon } from './icons/send';
 import { ShareIcon } from './icons/share';
 import { SideMenuCollapseClosedIcon } from './icons/side-menu-collapse-closed';
 import { SideMenuCollapseOpenIcon } from './icons/side-menu-collapse-open';
+import { TowersIcon } from './icons/towers';
 import { TwitterIcon } from './icons/twitter';
 import { UserIcon } from './icons/user';
 import { UserFilledIcon } from './icons/user-filled';
@@ -74,6 +78,7 @@ const icons = {
   circle: CircleIcon,
   clock: ClockIcon,
   close: CloseIcon,
+  coinflip: CoinflipIcon,
   copy: CopyIcon,
   danger: DangerIcon,
   dice: DiceIcon,
@@ -89,12 +94,14 @@ const icons = {
   infinite: InfiniteIcon,
   info: InfoIcon,
   instagram: InstagramIcon,
+  keno: KenoIcon,
   link: LinkIcon,
   live: LiveIcon,
   'live-casino-cards': LiveCasinoCardsIcon,
   lock: LockIcon,
   loading: LoadingIcon,
   mail: MailIcon,
+  mines: MinesIcon,
   minus: MinusIcon,
   mute: MuteIcon,
   'my-bets': MyBetsIcon,
@@ -110,6 +117,7 @@ const icons = {
   'safe-cert': SafeCertIcon,
   send: SendIcon,
   share: ShareIcon,
+  towers: TowersIcon,
   twitter: TwitterIcon,
   user: UserIcon,
   'user-filled': UserFilledIcon,
