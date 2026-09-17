@@ -79,6 +79,7 @@ const meta = {
   parameters: {
     layout: 'padded',
     backgrounds: { default: 'dark' },
+    appHeader: false,
     controls: {
       include: [
         'open',

@@ -1,19 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
-
-import {
-  APP_HEADER_BALANCES,
-  formatAppHeaderAmount,
-  getAppHeaderAmount,
-} from './app-header-balances';
+import { createContext, type ReactNode, useContext, useMemo } from 'react';
 
 import type {
   CashierBalance,
@@ -21,6 +8,7 @@ import type {
   CashierDropdownItem,
   CashierFormattedAmount,
 } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
+import { useWallet } from '#ui/features/wallet/wallet-provider';
 
 interface AppHeaderState {
   currencyId: CashierCurrencyId;
@@ -34,41 +22,25 @@ interface AppHeaderState {
 
 const AppHeaderContext = createContext<AppHeaderState | null>(null);
 
+/** Adapts the local demo wallet into the header cashier props. */
 export function AppHeaderProvider({ children }: { children: ReactNode }) {
-  const [currencyId, setCurrencyId] = useState<CashierCurrencyId>('btc');
-  const [displayFiat, setDisplayFiat] = useState(false);
-  const currentBalance =
-    APP_HEADER_BALANCES.find((balance) => balance.id === currencyId) ??
-    APP_HEADER_BALANCES[0];
-  const currentFormattedAmount = getAppHeaderAmount(currentBalance.id, displayFiat);
-  const items = useMemo<CashierDropdownItem[]>(
-    () =>
-      APP_HEADER_BALANCES.map((balance) => ({
-        balance,
-        formattedAmount: formatAppHeaderAmount(
-          getAppHeaderAmount(balance.id, displayFiat),
-        ),
-      })),
-    [displayFiat],
+  const wallet = useWallet();
+
+  const value = useMemo<AppHeaderState>(
+    () => ({
+      currencyId: wallet.currencyId,
+      displayFiat: wallet.displayFiat,
+      currentBalance: wallet.currentBalance,
+      currentFormattedAmount: wallet.currentFormattedAmount,
+      items: wallet.items,
+      onSelectBalance: wallet.onSelectBalance,
+      onDisplayFiatChange: wallet.onDisplayFiatChange,
+    }),
+    [wallet],
   );
-  const onSelectBalance = useCallback((balance: CashierBalance) => {
-    setCurrencyId(balance.id);
-  }, []);
 
   return (
-    <AppHeaderContext.Provider
-      value={{
-        currencyId,
-        displayFiat,
-        currentBalance,
-        currentFormattedAmount,
-        items,
-        onSelectBalance,
-        onDisplayFiatChange: setDisplayFiat,
-      }}
-    >
-      {children}
-    </AppHeaderContext.Provider>
+    <AppHeaderContext.Provider value={value}>{children}</AppHeaderContext.Provider>
   );
 }
 

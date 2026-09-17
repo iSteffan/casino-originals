@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
+import { AppChrome } from './app-chrome';
 import { Providers } from './providers';
-import { AppHeaderShell } from '#ui/layouts/app-header/app-header-shell';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,9 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body data-ds-motion-root="">
         <Providers>
-          <AppHeaderShell>{children}</AppHeaderShell>
+          <AppChrome>{children}</AppChrome>
         </Providers>
       </body>
     </html>

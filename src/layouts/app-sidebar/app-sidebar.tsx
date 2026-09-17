@@ -11,6 +11,7 @@ interface AppSidebarProps {
   activeHref?: string;
   expanded?: boolean;
   onToggle?: () => void;
+  navigate?: boolean;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export function AppSidebar({
   activeHref,
   expanded = true,
   onToggle,
+  navigate = false,
   className,
 }: AppSidebarProps) {
   return (
@@ -33,6 +35,7 @@ export function AppSidebar({
             title="Originals"
             items={APP_SIDEBAR_GAMES}
             activeHref={activeHref}
+            navigate={navigate}
           />
         </div>
       </div>

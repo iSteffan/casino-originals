@@ -84,19 +84,27 @@ interface PlaygroundArgs {
 }
 
 interface PendingFlip {
-  side: CoinflipSide;
+  pickedSide: CoinflipSide;
+  landedSide: CoinflipSide;
   startColor: CoinflipCoinColor;
+  betAmount: string;
 }
 
 function CoinflipCompositionStory() {
   const [args, updateArgs] = useArgs<PlaygroundArgs>();
   const pendingFlipRef = useRef<PendingFlip | null>(null);
 
-  const flipToSide = (landedSide: CoinflipSide) => {
+  const placeBet = () => {
     if (args.isVideoPlaying) return;
 
+    const landedSide: CoinflipSide = Math.random() < 0.5 ? 'HEADS' : 'TAILS';
     const startColor = getCoinflipStoryEndColor(args.videoSrc);
-    pendingFlipRef.current = { side: landedSide, startColor };
+    pendingFlipRef.current = {
+      pickedSide: args.side,
+      landedSide,
+      startColor,
+      betAmount: args.betAmount,
+    };
     updateArgs({
       videoSrc: getCoinflipVideoSrc({
         startColor,
@@ -104,6 +112,7 @@ function CoinflipCompositionStory() {
       }),
       isVideoPlaying: true,
       resultAnnouncement: undefined,
+      showWinModal: false,
     });
   };
 
@@ -116,16 +125,24 @@ function CoinflipCompositionStory() {
       return;
     }
 
-    const { side: landedSide } = pendingFlip;
+    const { pickedSide, landedSide, betAmount } = pendingFlip;
+    const isWin = landedSide === pickedSide;
+    const bet = Number.parseFloat(betAmount);
+    const winAmount = Number.isFinite(bet) ? (bet * 2).toFixed(2) : '0.00';
     const result = createCoinflipStoryLastResult(landedSide);
     updateArgs({
       videoSrc: getCoinflipIdleVideoSrc(getCoinflipEndColorFromSide(landedSide)),
       isVideoPlaying: false,
       lastResults: [result, ...args.lastResults].slice(0, 40),
-      resultAnnouncement: {
-        id: result.id,
-        message: landedSide === 'HEADS' ? 'Heads.' : 'Tails.',
-      },
+      resultAnnouncement: isWin
+        ? undefined
+        : {
+            id: result.id,
+            message: landedSide === 'HEADS' ? 'Heads.' : 'Tails.',
+          },
+      showWinModal: isWin,
+      winMultiplier: 'x2.00',
+      winAmount,
     });
   };
 
@@ -165,7 +182,7 @@ function CoinflipCompositionStory() {
         args.autoActionDisabled ||
         (args.isVideoPlaying && args.autoActionVariant !== 'stop'),
       theatreMode: args.theatreMode,
-      onManualAction: () => flipToSide(args.side),
+      onManualAction: placeBet,
       onAutoAction: () => undefined,
     },
     betAmount: {
@@ -249,7 +266,7 @@ function CoinflipCompositionStory() {
     <div
       className={cn(
         'bg-ds-black p-ds-4 md:p-ds-8 w-full',
-        args.theatreMode ? 'h-dvh' : 'min-h-screen',
+        args.theatreMode ? 'h-full min-h-0 overflow-hidden' : 'min-h-0 flex-1',
       )}
     >
       <TheatreModeSync
@@ -259,7 +276,7 @@ function CoinflipCompositionStory() {
       <div
         className={cn(
           'mx-auto flex w-full min-w-0 flex-col',
-          args.theatreMode ? 'h-full max-w-[1750px]' : 'max-w-[1400px]',
+          args.theatreMode ? 'h-full min-h-0 max-w-[1750px]' : 'max-w-[1400px]',
         )}
       >
         <OriginalsGameShell

@@ -36,6 +36,7 @@
   background: transparent;
   color: var(--color-ds-text-primary);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   outline: none;
   transition: background-color var(--ds-duration-base) var(--ds-ease-standard);

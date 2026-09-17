@@ -7,10 +7,13 @@ import { CashierDropdown } from './cashier-dropdown';
 import type { CashierCurrencyId } from './cashier-dropdown.types';
 
 import {
+  formatWalletAmount,
+  formatWalletAmountLabel,
+  INITIAL_WALLET_BALANCES,
+} from '#ui/features/wallet/wallet-balances';
+import {
   APP_HEADER_BALANCES,
   APP_HEADER_CASHIER_LABELS,
-  formatAppHeaderAmount,
-  getAppHeaderAmount,
 } from '#ui/layouts/app-header/app-header-balances';
 
 function CashierDropdownPlayground() {
@@ -23,11 +26,15 @@ function CashierDropdownPlayground() {
   return (
     <CashierDropdown
       currentBalance={currentBalance}
-      currentFormattedAmount={getAppHeaderAmount(currentBalance.id, displayFiat)}
+      currentFormattedAmount={formatWalletAmount(
+        INITIAL_WALLET_BALANCES[currentBalance.id],
+        currentBalance.id,
+        displayFiat,
+      )}
       items={APP_HEADER_BALANCES.map((balance) => ({
         balance,
-        formattedAmount: formatAppHeaderAmount(
-          getAppHeaderAmount(balance.id, displayFiat),
+        formattedAmount: formatWalletAmountLabel(
+          formatWalletAmount(INITIAL_WALLET_BALANCES[balance.id], balance.id, displayFiat),
         ),
       }))}
       onSelectBalance={(balance) => setCurrencyId(balance.id)}

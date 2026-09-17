@@ -10,6 +10,7 @@ import { definePreview } from '@storybook/nextjs-vite';
 import { themes } from 'storybook/theming';
 import pseudoStates from 'storybook-addon-pseudo-states';
 
+import { WalletProvider } from '#ui/features/wallet/wallet-provider';
 import { AppHeaderShell } from '#ui/layouts/app-header/app-header-shell';
 import { getAppSidebarActiveHref } from '#ui/layouts/app-sidebar/app-sidebar-games';
 
@@ -35,7 +36,9 @@ function withNextIntl(Story: ComponentType) {
       onError={onIntlError}
       getMessageFallback={getMessageFallback}
     >
-      <Story />
+      <WalletProvider>
+        <Story />
+      </WalletProvider>
     </NextIntlClientProvider>
   );
 }
@@ -53,7 +56,7 @@ function withAppHeader(
   }
 
   return (
-    <AppHeaderShell activeGameHref={getAppSidebarActiveHref(context?.id)}>
+    <AppHeaderShell activeGameHref={getAppSidebarActiveHref(context?.id)} navigate={false}>
       <Story />
     </AppHeaderShell>
   );

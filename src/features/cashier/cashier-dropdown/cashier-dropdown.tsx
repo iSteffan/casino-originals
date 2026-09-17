@@ -36,7 +36,11 @@ function TruncatingAmount({
     if (!element || typeof ResizeObserver === 'undefined') return undefined;
 
     const update = () => {
-      setTruncated(element.scrollWidth > element.clientWidth + 1);
+      const overflow = element.scrollWidth - element.clientWidth;
+      // Hysteresis: entering truncation uses a 1px threshold; leaving requires
+      // the content to fully fit. Without this, crypto amounts at the edge
+      // flip padding/ellipsis every frame and visibly shift.
+      setTruncated((wasTruncated) => (wasTruncated ? overflow > 0 : overflow > 1));
     };
 
     update();
