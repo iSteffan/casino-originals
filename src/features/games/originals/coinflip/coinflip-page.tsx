@@ -52,14 +52,13 @@ import {
   formatWalletAmountLabel,
   formatWinRate,
   getCryptoStakeFloorRate,
-  getDefaultCryptoBetAmount,
   getFiatStakeUsd,
   SINGLE_BET_THRESHOLD_USD,
   WALLET_CRYPTO_FRACTION_DIGITS,
 } from "#ui/features/wallet/wallet-balances";
 import { useBetAmountDisplay } from "#ui/features/wallet/use-bet-amount-display";
 import { useWallet } from "#ui/features/wallet/wallet-provider";
-import { TheatreModeSync } from "#ui/layouts/app-header/app-layout-provider";
+import { TheatreModeSync, useAppLayoutState } from "#ui/layouts/app-header/app-layout-provider";
 import { cn } from "#ui/lib/cn";
 import { Image } from "#ui/primitives/data-display/image/image";
 
@@ -148,33 +147,31 @@ function CurrencyIcon({ src, size }: { src: string; size: 20 | 32 }) {
 
 export function CoinflipPage() {
   const wallet = useWallet();
-  const [state, setState] = useState<CoinflipPageState>(() => {
-    const bet = getDefaultCryptoBetAmount(wallet.currencyId);
-    return {
-      mode: "manual",
-      betAmount: bet,
-      side: "HEADS",
-      turboMode: false,
-      rounds: "100",
-      theatreMode: false,
-      volume: 0.75,
-      onWinValue: 50,
-      onLossValue: 50,
-      stopProfitValue: "",
-      stopLossValue: "",
-      isActiveOnWin: false,
-      isActiveOnLoss: false,
-      videoSrc: COINFLIP_DEFAULT_VIDEO_SRC,
-      isVideoPlaying: false,
-      lastResults: [],
-      showWinModal: false,
-      winMultiplier: "x2.00",
-      winAmount: "0.00",
-      auto: { kind: "idle" },
-      metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
-      initialBet: bet,
-    };
-  });
+  const { theatreLayoutActive, theatreModeActive } = useAppLayoutState();
+  const [state, setState] = useState<CoinflipPageState>(() => ({
+    mode: "manual",
+    betAmount: "0",
+    side: "HEADS",
+    turboMode: false,
+    rounds: "0",
+    theatreMode: false,
+    volume: 0.75,
+    onWinValue: 50,
+    onLossValue: 50,
+    stopProfitValue: "",
+    stopLossValue: "",
+    isActiveOnWin: false,
+    isActiveOnLoss: false,
+    videoSrc: COINFLIP_DEFAULT_VIDEO_SRC,
+    isVideoPlaying: false,
+    lastResults: [],
+    showWinModal: false,
+    winMultiplier: "x2.00",
+    winAmount: "0.00",
+    auto: { kind: "idle" },
+    metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
+    initialBet: "0",
+  }));
 
   const pendingFlipRef = useRef<PendingFlip | null>(null);
   const stateRef = useRef(state);
@@ -481,7 +478,7 @@ export function CoinflipPage() {
     ) {
       return;
     }
-    const next = getDefaultCryptoBetAmount(wallet.currencyId);
+    const next = "0";
     applyAutobetEdit({ betAmount: next, initialBet: next });
   }, [wallet.currencyId]);
 
@@ -590,7 +587,7 @@ export function CoinflipPage() {
       autoActionDisabled:
         (state.isVideoPlaying && autobetAction.variant !== "stop") ||
         (autobetAction.variant === "start" && exceedsWallet),
-      theatreMode: state.theatreMode,
+      theatreMode: theatreLayoutActive,
       onManualAction: placeManualBet,
       onAutoAction: handleAutoAction,
     },
@@ -693,7 +690,7 @@ export function CoinflipPage() {
     <div
       className={cn(
         "bg-ds-black p-ds-4 md:p-ds-8 w-full",
-        state.theatreMode ? "h-full min-h-0 overflow-hidden" : "min-h-0 flex-1",
+        theatreLayoutActive ? "h-full min-h-0 overflow-hidden" : "min-h-0 flex-1",
       )}
     >
       <TheatreModeSync
@@ -702,10 +699,9 @@ export function CoinflipPage() {
       />
       <div
         className={cn(
-          "mx-auto flex w-full min-w-0 flex-col",
-          state.theatreMode
-            ? "h-full min-h-0 max-w-[1750px]"
-            : "max-w-[1400px]",
+          "mx-auto flex w-full min-w-0 flex-col transition-[max-width] duration-ds-slow ease-ds-standard",
+          theatreLayoutActive && "h-full min-h-0",
+          theatreModeActive ? "max-w-[1750px]" : "max-w-[1400px]",
         )}
       >
         <OriginalsGameShell
@@ -739,7 +735,7 @@ export function CoinflipPage() {
               isVideoPlaying={board.isVideoPlaying}
               onVideoEnd={board.onVideoEnd}
               onPlaybackError={board.onPlaybackError}
-              theatreMode={board.theatreMode}
+              theatreMode={theatreLayoutActive}
               turboMode={board.turboMode}
               volume={board.volume}
               lastResults={board.lastResults}
@@ -750,7 +746,7 @@ export function CoinflipPage() {
               overlay={board.overlay}
             />
           }
-          theatreMode={state.theatreMode}
+          theatreMode={theatreLayoutActive}
         />
       </div>
     </div>

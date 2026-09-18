@@ -20,7 +20,7 @@ export function OriginalsGameShell({
     <div
       className={cn(
         'flex w-full min-w-0 flex-col',
-        theatreMode && 'lg:h-full lg:min-h-0',
+        theatreMode && 'h-full min-h-0',
         className,
       )}
     >
@@ -30,7 +30,7 @@ export function OriginalsGameShell({
         data-slot="originals-game-body"
         className={cn(
           'bg-ds-black relative flex min-h-0 flex-col gap-4 max-lg:h-auto lg:flex-row lg:items-stretch lg:gap-2',
-          theatreMode && 'lg:h-full lg:flex-1 lg:overflow-hidden',
+          theatreMode && 'h-full flex-1 overflow-hidden',
         )}
       >
         <div

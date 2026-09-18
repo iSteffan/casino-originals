@@ -30,6 +30,7 @@ function AppHeaderShellFrame({
     toggleSideMenu,
     closeMobileMenu,
     theatreModeActive,
+    theatreLayoutActive,
   } = useAppLayoutState();
 
   useEffect(() => {
@@ -38,14 +39,13 @@ function AppHeaderShellFrame({
 
   return (
     <div
-      className={cn(
-        'flex flex-col',
-        theatreModeActive ? 'h-dvh overflow-hidden' : 'min-h-dvh',
-      )}
+      className="bg-ds-surface-primary flex h-dvh flex-col overflow-hidden"
       data-mobile-menu-open={mobileMenuOpen || undefined}
+      data-theatre-mode={theatreModeActive || undefined}
+      data-theatre-layout={theatreLayoutActive || undefined}
     >
       <AppHeader showMenuTrigger={showSidebar} sideMenuId={APP_SIDE_MENU_ID} />
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {showSidebar ? (
           <AppSidebar
             id={APP_SIDE_MENU_ID}
@@ -57,7 +57,14 @@ function AppHeaderShellFrame({
             navigate={navigate}
           />
         ) : null}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+        <div
+          className={cn(
+            'bg-ds-black flex min-h-0 min-w-0 flex-1 flex-col',
+            theatreLayoutActive ? 'overflow-hidden' : 'overflow-y-auto',
+          )}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

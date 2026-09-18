@@ -43,6 +43,8 @@ interface WalletState {
     betAmount: string;
     payoutAmount: string;
   }) => boolean;
+  /** Sets the absolute crypto balance for a currency (demo cashier editor). */
+  setBalance: (currencyId: CashierCurrencyId, cryptoAmount: string) => void;
 }
 
 const WalletContext = createContext<WalletState | null>(null);
@@ -108,6 +110,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [balances, currencyId],
   );
 
+  const setBalance = useCallback(
+    (targetCurrencyId: CashierCurrencyId, cryptoAmount: string) => {
+      const next = new BigNumber(cryptoAmount || 0);
+      if (!next.isFinite() || next.lt(0)) return;
+
+      setBalances((current) => ({
+        ...current,
+        [targetCurrencyId]: next.toFixed(),
+      }));
+    },
+    [],
+  );
+
   const value = useMemo<WalletState>(
     () => ({
       currencyId,
@@ -121,6 +136,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       onDisplayFiatChange: setDisplayFiat,
       canAfford,
       applyRound,
+      setBalance,
     }),
     [
       applyRound,
@@ -133,6 +149,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fiatRate,
       items,
       onSelectBalance,
+      setBalance,
     ],
   );
 

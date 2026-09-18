@@ -1,6 +1,7 @@
 'use client';
 
 import { APP_SIDEBAR_GAMES } from './app-sidebar-games';
+import { AppSidebarCashier } from './app-sidebar-cashier';
 
 import { SideMenuGameList } from '#ui/layouts/side-menu/side-menu-game-list';
 import { cn } from '#ui/lib/cn';
@@ -56,13 +57,16 @@ export function AppSidebar({
       >
         <div className="ds-app-sidebar-content">
           <div className="ds-app-sidebar-toolbar" aria-hidden={!onToggle} />
-          <div className="ds-app-sidebar-games" aria-hidden={!contentExpanded}>
-            <SideMenuGameList
-              title="Originals"
-              items={APP_SIDEBAR_GAMES}
-              activeHref={activeHref}
-              navigate={navigate}
-            />
+          <div className="ds-app-sidebar-expanded" aria-hidden={!contentExpanded}>
+            <div className="ds-app-sidebar-games">
+              <SideMenuGameList
+                title="Originals"
+                items={APP_SIDEBAR_GAMES}
+                activeHref={activeHref}
+                navigate={navigate}
+              />
+            </div>
+            <AppSidebarCashier />
           </div>
         </div>
 

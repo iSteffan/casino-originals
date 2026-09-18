@@ -50,23 +50,73 @@
 .ds-app-sidebar-content {
   display: flex;
   width: 18rem;
+  min-height: 0;
   height: 100%;
+  flex: 1;
   flex-direction: column;
   gap: var(--ds-spacing-2);
   padding: var(--ds-spacing-3);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .ds-app-sidebar-toolbar {
   display: none;
+  flex: none;
   min-height: var(--ds-spacing-9);
+}
+
+.ds-app-sidebar-expanded {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--ds-spacing-4);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .ds-app-sidebar-games {
   min-width: 0;
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior-y: contain;
+}
+
+.ds-app-sidebar-cashier {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  flex-direction: column;
+  gap: var(--ds-spacing-2);
+  padding-top: var(--ds-spacing-2);
+  border-top: 1px solid var(--color-ds-border-tertiary);
+}
+
+.ds-app-sidebar-cashier-trigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-spacing-2);
+  padding-inline: var(--ds-spacing-3);
+  border: 1px solid var(--color-ds-border-primary);
+  border-radius: var(--ds-radius-xs);
+  background-color: var(--color-ds-surface-secondary);
+  color: var(--color-ds-text-primary);
+  cursor: pointer;
+  outline: none;
+}
+
+.ds-app-sidebar-cashier-actions {
+  display: flex;
+  width: 100%;
+  gap: var(--ds-spacing-2);
 }
 
 .ds-app-sidebar-toggle {
@@ -137,6 +187,10 @@
     z-index: auto;
     width: 4rem;
     max-width: 4rem;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    align-self: stretch;
     visibility: visible;
     pointer-events: auto;
     translate: none;
@@ -150,7 +204,7 @@
     max-width: 18rem;
   }
 
-  .ds-app-sidebar-games {
+  .ds-app-sidebar-expanded {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -159,7 +213,7 @@
       visibility var(--ds-duration-slow) var(--ds-ease-standard);
   }
 
-  .ds-app-sidebar[data-expanded] .ds-app-sidebar-games {
+  .ds-app-sidebar[data-expanded] .ds-app-sidebar-expanded {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
@@ -177,7 +231,7 @@
 @media (prefers-reduced-motion: reduce) {
   .ds-app-sidebar,
   .ds-app-sidebar-backdrop,
-  .ds-app-sidebar-games,
+  .ds-app-sidebar-expanded,
   .ds-app-sidebar-toggle,
   .ds-app-sidebar-toggle-icon > [data-slot='icon'] {
     transition: none;
@@ -193,6 +247,9 @@
   z-index: auto;
   width: 4rem;
   max-width: 4rem;
+  height: auto;
+  max-height: none;
+  min-height: 100dvh;
   visibility: visible;
   pointer-events: auto;
   translate: none;
@@ -203,13 +260,13 @@
   max-width: 18rem;
 }
 
-.ds-app-sidebar.ds-app-sidebar-story .ds-app-sidebar-games {
+.ds-app-sidebar.ds-app-sidebar-story .ds-app-sidebar-expanded {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
 
-.ds-app-sidebar.ds-app-sidebar-story[data-expanded] .ds-app-sidebar-games {
+.ds-app-sidebar.ds-app-sidebar-story[data-expanded] .ds-app-sidebar-expanded {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;

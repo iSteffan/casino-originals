@@ -166,8 +166,14 @@ export function OriginalsConfig({
 
       <div className="gap-ds-3 flex w-full min-w-0 flex-1 flex-col max-lg:contents lg:min-h-0 lg:overflow-hidden">
         {children ? (
-          <div className="no-scrollbar order-2 flex min-h-0 flex-col lg:order-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overflow-x-hidden">
-            {children}
+          <div
+            className={cn(
+              'no-scrollbar order-2 flex min-h-0 flex-col lg:order-1 lg:min-h-0 lg:flex-1',
+              theatreMode
+                ? 'lg:overflow-x-hidden lg:overflow-y-auto'
+                : 'lg:overflow-visible',
+            )}
+          >            {children}
             {autobetSession ? (
               <OriginalsConfigModeStack
                 mode={mode}

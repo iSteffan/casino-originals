@@ -15,6 +15,8 @@ interface AppLayoutState {
   sideMenuExpanded: boolean;
   mobileMenuOpen: boolean;
   theatreModeActive: boolean;
+  /** Height/fill layout; stays true while the sidebar finishes opening on exit. */
+  theatreLayoutActive: boolean;
   effectiveSideMenuExpanded: boolean;
   toggleSideMenu: () => void;
   toggleMobileMenu: () => void;
@@ -26,11 +28,14 @@ interface AppLayoutState {
 const AppLayoutContext = createContext<AppLayoutState | null>(null);
 
 const DESKTOP_SIDEBAR_QUERY = '(width >= 64rem)';
+/** Matches `.ds-app-sidebar` width transition (`--ds-duration-slow`). */
+const SIDEBAR_WIDTH_TRANSITION_MS = 300;
 
 export function AppLayoutProvider({ children }: { children: ReactNode }) {
   const [sideMenuExpanded, setSideMenuExpanded] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theatreModeActive, setTheatreModeActiveState] = useState(false);
+  const [theatreLayoutActive, setTheatreLayoutActive] = useState(false);
   const theatreExitRef = useRef<(() => void) | null>(null);
   const pendingTheatreExitRef = useRef(false);
 
@@ -64,6 +69,14 @@ export function AppLayoutProvider({ children }: { children: ReactNode }) {
     }
 
     setSideMenuExpanded((current) => !current);
+  }, [theatreModeActive]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setTheatreLayoutActive(theatreModeActive);
+    }, SIDEBAR_WIDTH_TRANSITION_MS);
+
+    return () => window.clearTimeout(timeoutId);
   }, [theatreModeActive]);
 
   useEffect(() => {
@@ -101,6 +114,7 @@ export function AppLayoutProvider({ children }: { children: ReactNode }) {
       sideMenuExpanded,
       mobileMenuOpen,
       theatreModeActive,
+      theatreLayoutActive,
       effectiveSideMenuExpanded: sideMenuExpanded && !theatreModeActive,
       toggleSideMenu,
       toggleMobileMenu,
@@ -112,6 +126,7 @@ export function AppLayoutProvider({ children }: { children: ReactNode }) {
       sideMenuExpanded,
       mobileMenuOpen,
       theatreModeActive,
+      theatreLayoutActive,
       toggleSideMenu,
       toggleMobileMenu,
       closeMobileMenu,
