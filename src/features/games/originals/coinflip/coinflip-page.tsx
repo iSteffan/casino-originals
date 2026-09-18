@@ -693,7 +693,7 @@ export function CoinflipPage() {
     <div
       className={cn(
         "bg-ds-black p-ds-4 md:p-ds-8 w-full",
-        state.theatreMode ? 'h-full min-h-0 overflow-hidden' : 'min-h-0 flex-1',
+        state.theatreMode ? "h-full min-h-0 overflow-hidden" : "min-h-0 flex-1",
       )}
     >
       <TheatreModeSync
@@ -703,7 +703,9 @@ export function CoinflipPage() {
       <div
         className={cn(
           "mx-auto flex w-full min-w-0 flex-col",
-          state.theatreMode ? 'h-full min-h-0 max-w-[1750px]' : 'max-w-[1400px]',
+          state.theatreMode
+            ? "h-full min-h-0 max-w-[1750px]"
+            : "max-w-[1400px]",
         )}
       >
         <OriginalsGameShell

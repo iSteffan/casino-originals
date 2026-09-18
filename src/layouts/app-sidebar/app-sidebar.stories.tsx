@@ -17,7 +17,7 @@ function AppSidebarPlayground() {
       activeHref={activeHref}
       expanded={expanded}
       onToggle={() => updateArgs({ expanded: !expanded })}
-      className="!flex min-h-dvh"
+      className="ds-app-sidebar-story min-h-dvh"
     />
   );
 }

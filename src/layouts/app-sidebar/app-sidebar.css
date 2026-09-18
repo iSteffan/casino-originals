@@ -1,47 +1,69 @@
-.ds-app-sidebar {
-  position: relative;
-  display: none;
-  width: 4rem;
-  max-width: 4rem;
-  min-width: 0;
-  flex: none;
-  flex-direction: column;
-  overflow: hidden;
-  background-color: var(--color-ds-surface-primary);
-  border-right: 1px solid var(--color-ds-border-tertiary);
+.ds-app-sidebar-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+  border: 0;
+  background-color: color-mix(in srgb, var(--color-ds-black) 60%, transparent);
   transition:
-    width var(--ds-duration-slow) var(--ds-ease-standard),
-    max-width var(--ds-duration-slow) var(--ds-ease-standard);
+    opacity var(--ds-duration-base) var(--ds-ease-standard),
+    visibility var(--ds-duration-base) var(--ds-ease-standard);
 }
 
-.ds-app-sidebar[data-expanded] {
+.ds-app-sidebar-backdrop[data-mobile-open] {
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.ds-app-sidebar {
+  position: fixed;
+  z-index: 45;
+  top: 4rem;
+  bottom: 0;
+  left: 0;
+  display: flex;
   width: 18rem;
-  max-width: 18rem;
+  max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior-y: contain;
+  visibility: hidden;
+  pointer-events: none;
+  background-color: var(--color-ds-surface-primary);
+  border-right: 1px solid var(--color-ds-border-tertiary);
+  translate: -100% 0;
+  transition:
+    translate var(--ds-duration-base) var(--ds-ease-standard),
+    visibility var(--ds-duration-base) var(--ds-ease-standard);
+}
+
+.ds-app-sidebar[data-mobile-open] {
+  visibility: visible;
+  pointer-events: auto;
+  translate: 0 0;
 }
 
 .ds-app-sidebar-content {
   display: flex;
   width: 18rem;
+  height: 100%;
   flex-direction: column;
   gap: var(--ds-spacing-2);
   padding: var(--ds-spacing-3);
+  overflow: auto;
 }
 
 .ds-app-sidebar-toolbar {
+  display: none;
   min-height: var(--ds-spacing-9);
 }
 
 .ds-app-sidebar-games {
   min-width: 0;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity var(--ds-duration-slow) var(--ds-ease-standard),
-    visibility var(--ds-duration-slow) var(--ds-ease-standard);
-}
-
-.ds-app-sidebar[data-expanded] .ds-app-sidebar-games {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -103,20 +125,100 @@
 }
 
 @media (width >= 64rem) {
+  .ds-app-sidebar-backdrop {
+    display: none;
+  }
+
   .ds-app-sidebar {
-    display: flex;
+    position: relative;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    z-index: auto;
+    width: 4rem;
+    max-width: 4rem;
+    visibility: visible;
+    pointer-events: auto;
+    translate: none;
+    transition:
+      width var(--ds-duration-slow) var(--ds-ease-standard),
+      max-width var(--ds-duration-slow) var(--ds-ease-standard);
+  }
+
+  .ds-app-sidebar[data-expanded] {
+    width: 18rem;
+    max-width: 18rem;
+  }
+
+  .ds-app-sidebar-games {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity var(--ds-duration-slow) var(--ds-ease-standard),
+      visibility var(--ds-duration-slow) var(--ds-ease-standard);
+  }
+
+  .ds-app-sidebar[data-expanded] .ds-app-sidebar-games {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .ds-app-sidebar-toggle {
     display: inline-flex;
   }
+
+  .ds-app-sidebar-toolbar {
+    display: block;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ds-app-sidebar,
+  .ds-app-sidebar-backdrop,
   .ds-app-sidebar-games,
   .ds-app-sidebar-toggle,
   .ds-app-sidebar-toggle-icon > [data-slot='icon'] {
     transition: none;
   }
+}
+
+/* Isolated Storybook playground: keep the rail in-flow like desktop. */
+.ds-app-sidebar.ds-app-sidebar-story {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  z-index: auto;
+  width: 4rem;
+  max-width: 4rem;
+  visibility: visible;
+  pointer-events: auto;
+  translate: none;
+}
+
+.ds-app-sidebar.ds-app-sidebar-story[data-expanded] {
+  width: 18rem;
+  max-width: 18rem;
+}
+
+.ds-app-sidebar.ds-app-sidebar-story .ds-app-sidebar-games {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ds-app-sidebar.ds-app-sidebar-story[data-expanded] .ds-app-sidebar-games {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.ds-app-sidebar.ds-app-sidebar-story .ds-app-sidebar-toggle {
+  display: inline-flex;
+}
+
+.ds-app-sidebar.ds-app-sidebar-story .ds-app-sidebar-toolbar {
+  display: block;
 }

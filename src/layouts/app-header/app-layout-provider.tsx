@@ -13,17 +13,23 @@ import {
 
 interface AppLayoutState {
   sideMenuExpanded: boolean;
+  mobileMenuOpen: boolean;
   theatreModeActive: boolean;
   effectiveSideMenuExpanded: boolean;
   toggleSideMenu: () => void;
+  toggleMobileMenu: () => void;
+  closeMobileMenu: () => void;
   setTheatreModeActive: (active: boolean) => void;
   registerTheatreExit: (exit: (() => void) | null) => void;
 }
 
 const AppLayoutContext = createContext<AppLayoutState | null>(null);
 
+const DESKTOP_SIDEBAR_QUERY = '(width >= 64rem)';
+
 export function AppLayoutProvider({ children }: { children: ReactNode }) {
   const [sideMenuExpanded, setSideMenuExpanded] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theatreModeActive, setTheatreModeActiveState] = useState(false);
   const theatreExitRef = useRef<(() => void) | null>(null);
   const pendingTheatreExitRef = useRef(false);
@@ -40,6 +46,14 @@ export function AppLayoutProvider({ children }: { children: ReactNode }) {
     theatreExitRef.current = exit;
   }, []);
 
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false);
+  }, []);
+
+  const toggleMobileMenu = useCallback(() => {
+    setMobileMenuOpen((current) => !current);
+  }, []);
+
   const toggleSideMenu = useCallback(() => {
     if (theatreModeActive) {
       pendingTheatreExitRef.current = true;
@@ -52,19 +66,55 @@ export function AppLayoutProvider({ children }: { children: ReactNode }) {
     setSideMenuExpanded((current) => !current);
   }, [theatreModeActive]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(DESKTOP_SIDEBAR_QUERY);
+    const sync = () => {
+      if (mediaQuery.matches) setMobileMenuOpen(false);
+    };
+
+    sync();
+    mediaQuery.addEventListener('change', sync);
+    return () => mediaQuery.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
   const value = useMemo<AppLayoutState>(
     () => ({
       sideMenuExpanded,
+      mobileMenuOpen,
       theatreModeActive,
       effectiveSideMenuExpanded: sideMenuExpanded && !theatreModeActive,
       toggleSideMenu,
+      toggleMobileMenu,
+      closeMobileMenu,
       setTheatreModeActive,
       registerTheatreExit,
     }),
     [
       sideMenuExpanded,
+      mobileMenuOpen,
       theatreModeActive,
       toggleSideMenu,
+      toggleMobileMenu,
+      closeMobileMenu,
       setTheatreModeActive,
       registerTheatreExit,
     ],
