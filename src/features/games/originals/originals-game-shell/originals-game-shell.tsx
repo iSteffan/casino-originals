@@ -33,10 +33,11 @@ export function OriginalsGameShell({
           theatreMode && 'h-full flex-1 overflow-hidden',
         )}
       >
+        {/* DOM order matches visual order on all breakpoints (config, then board). */}
         <div
           data-slot="originals-game-config"
           className={cn(
-            'order-2 w-full shrink-0 lg:order-1 lg:w-fit',
+            'w-full shrink-0 lg:w-fit',
             theatreMode && 'lg:h-full lg:min-h-0',
           )}
         >
@@ -46,7 +47,7 @@ export function OriginalsGameShell({
         <div
           data-slot="originals-game-board"
           className={cn(
-            'relative isolate order-1 flex w-full min-w-0 flex-col max-lg:overflow-visible lg:order-2 lg:min-h-0 lg:flex-1 lg:overflow-hidden',
+            'relative isolate flex w-full min-w-0 flex-col max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden',
             theatreMode && 'lg:h-full',
           )}
         >

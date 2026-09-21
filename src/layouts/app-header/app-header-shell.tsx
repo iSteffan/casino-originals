@@ -3,9 +3,9 @@
 import { type ReactNode, useEffect } from 'react';
 
 import { AppHeader } from './app-header';
-import { AppHeaderProvider } from './app-header-provider';
 import { AppLayoutProvider, useAppLayoutState } from './app-layout-provider';
 
+import { useWallet } from '#ui/features/wallet/wallet-provider';
 import { AppSidebar } from '#ui/layouts/app-sidebar/app-sidebar';
 import { cn } from '#ui/lib/cn';
 
@@ -24,6 +24,7 @@ function AppHeaderShellFrame({
   showSidebar = true,
   navigate = false,
 }: AppHeaderShellProps) {
+  const wallet = useWallet();
   const {
     effectiveSideMenuExpanded,
     mobileMenuOpen,
@@ -44,7 +45,16 @@ function AppHeaderShellFrame({
       data-theatre-mode={theatreModeActive || undefined}
       data-theatre-layout={theatreLayoutActive || undefined}
     >
-      <AppHeader showMenuTrigger={showSidebar} sideMenuId={APP_SIDE_MENU_ID} />
+      <AppHeader
+        showMenuTrigger={showSidebar}
+        sideMenuId={APP_SIDE_MENU_ID}
+        currentBalance={wallet.currentBalance}
+        currentFormattedAmount={wallet.currentFormattedAmount}
+        items={wallet.items}
+        onSelectBalance={wallet.onSelectBalance}
+        displayFiat={wallet.displayFiat}
+        onDisplayFiatChange={wallet.onDisplayFiatChange}
+      />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {showSidebar ? (
           <AppSidebar
@@ -55,6 +65,8 @@ function AppHeaderShellFrame({
             onToggle={toggleSideMenu}
             onMobileClose={closeMobileMenu}
             navigate={navigate}
+            balances={wallet.balances}
+            setBalance={wallet.setBalance}
           />
         ) : null}
         <div
@@ -72,11 +84,9 @@ function AppHeaderShellFrame({
 
 export function AppHeaderShell(props: AppHeaderShellProps) {
   return (
-    <AppHeaderProvider>
-      <AppLayoutProvider>
-        <AppHeaderShellFrame {...props} />
-      </AppLayoutProvider>
-    </AppHeaderProvider>
+    <AppLayoutProvider>
+      <AppHeaderShellFrame {...props} />
+    </AppLayoutProvider>
   );
 }
 

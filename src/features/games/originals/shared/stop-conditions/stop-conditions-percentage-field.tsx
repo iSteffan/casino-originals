@@ -112,14 +112,14 @@ export function StopConditionsPercentageField({
             className={cn(
               'text-ds-body-lg font-ds-medium',
               !isInputDisabled &&
-                (isValueMuted ? 'text-ds-text-secondary' : 'text-ds-text-primary'),
+                (isValueMuted ? 'text-ds-text-tertiary' : 'text-ds-text-primary'),
             )}
             trailing={
               <span
                 className={cn(
                   'text-ds-body-md pr-ds-3 group-data-[disabled]:text-ds-text-tertiary',
                   !isInputDisabled &&
-                    (isValueMuted ? 'text-ds-text-secondary' : 'text-ds-text-primary'),
+                    (isValueMuted ? 'text-ds-text-tertiary' : 'text-ds-text-primary'),
                 )}
               >
                 %

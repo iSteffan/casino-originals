@@ -8,8 +8,9 @@
 }
 
 .ds-originals-field [data-slot='input']::placeholder {
-  color: var(--color-ds-text-secondary);
+  color: var(--color-ds-text-tertiary);
   font-weight: var(--ds-font-weight-medium);
+  opacity: 1;
 }
 
 .ds-originals-field[data-disabled] {

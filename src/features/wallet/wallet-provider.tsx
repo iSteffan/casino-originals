@@ -18,13 +18,13 @@ import {
   WALLET_FIAT_RATES,
 } from './wallet-balances';
 
+import { CASHIER_BALANCES } from '#ui/features/cashier/cashier-balances';
 import type {
   CashierBalance,
   CashierCurrencyId,
   CashierDropdownItem,
   CashierFormattedAmount,
 } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
-import { APP_HEADER_BALANCES } from '#ui/layouts/app-header/app-header-balances';
 
 interface WalletState {
   currencyId: CashierCurrencyId;
@@ -55,8 +55,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [balances, setBalances] = useState(INITIAL_WALLET_BALANCES);
 
   const currentBalance =
-    APP_HEADER_BALANCES.find((balance) => balance.id === currencyId) ??
-    APP_HEADER_BALANCES[0];
+    CASHIER_BALANCES.find((balance) => balance.id === currencyId) ??
+    CASHIER_BALANCES[0];
 
   const currentFormattedAmount = useMemo(
     () => formatWalletAmount(balances[currencyId], currencyId, displayFiat),
@@ -65,7 +65,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const items = useMemo<CashierDropdownItem[]>(
     () =>
-      APP_HEADER_BALANCES.map((balance) => ({
+      CASHIER_BALANCES.map((balance) => ({
         balance,
         formattedAmount: formatWalletAmountLabel(
           formatWalletAmount(balances[balance.id], balance.id, displayFiat),

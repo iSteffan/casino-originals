@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 
 import BigNumber from 'bignumber.js';
 
+import { CASHIER_BALANCES } from '#ui/features/cashier/cashier-balances';
 import type { CashierCurrencyId } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
-import { useWallet } from '#ui/features/wallet/wallet-provider';
-import { APP_HEADER_BALANCES } from '#ui/layouts/app-header/app-header-balances';
 import { cn } from '#ui/lib/cn';
 import { Button } from '#ui/primitives/actions/button/button';
 import { Image } from '#ui/primitives/data-display/image/image';
@@ -33,15 +32,24 @@ function CurrencyIcon({ src }: { src: string }) {
   );
 }
 
-export function AppSidebarCashier({ className }: { className?: string }) {
-  const { balances, setBalance } = useWallet();
+interface AppSidebarCashierProps {
+  className?: string;
+  balances: Record<CashierCurrencyId, string>;
+  setBalance: (currencyId: CashierCurrencyId, cryptoAmount: string) => void;
+}
+
+export function AppSidebarCashier({
+  className,
+  balances,
+  setBalance,
+}: AppSidebarCashierProps) {
   const [currencyId, setCurrencyId] = useState<CashierCurrencyId>('btc');
   const [draft, setDraft] = useState(() => balances.btc);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const selected =
-    APP_HEADER_BALANCES.find((balance) => balance.id === currencyId) ??
-    APP_HEADER_BALANCES[0];
+    CASHIER_BALANCES.find((balance) => balance.id === currencyId) ??
+    CASHIER_BALANCES[0];
 
   useEffect(() => {
     setDraft(balances[currencyId]);
@@ -104,7 +112,7 @@ export function AppSidebarCashier({ className }: { className?: string }) {
           className="flex w-[var(--radix-popover-trigger-width)] min-w-[12rem] flex-col overflow-hidden p-0"
         >
           <div className="px-ds-2 py-ds-2 flex flex-col">
-            {APP_HEADER_BALANCES.map((balance) => {
+            {CASHIER_BALANCES.map((balance) => {
               const isSelected = balance.id === currencyId;
               return (
                 <button
@@ -161,3 +169,5 @@ export function AppSidebarCashier({ className }: { className?: string }) {
     </div>
   );
 }
+
+export type { AppSidebarCashierProps };

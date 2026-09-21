@@ -1,9 +1,13 @@
 'use client';
 
-import { APP_HEADER_CASHIER_LABELS } from './app-header-balances';
-import { useAppHeaderState } from './app-header-provider';
 import { useAppLayoutState } from './app-layout-provider';
 
+import { CASHIER_DROPDOWN_LABELS } from '#ui/features/cashier/cashier-balances';
+import type {
+  CashierBalance,
+  CashierDropdownItem,
+  CashierFormattedAmount,
+} from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
 import { CashierDropdown } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown';
 import { cn } from '#ui/lib/cn';
 import { Button } from '#ui/primitives/actions/button/button';
@@ -14,21 +18,25 @@ interface AppHeaderProps {
   className?: string;
   showMenuTrigger?: boolean;
   sideMenuId?: string;
+  currentBalance: CashierBalance;
+  currentFormattedAmount: CashierFormattedAmount;
+  items: readonly CashierDropdownItem[];
+  onSelectBalance: (balance: CashierBalance) => void;
+  displayFiat: boolean;
+  onDisplayFiatChange: (checked: boolean) => void;
 }
 
 export function AppHeader({
   className,
   showMenuTrigger = false,
   sideMenuId = 'app-side-menu',
+  currentBalance,
+  currentFormattedAmount,
+  items,
+  onSelectBalance,
+  displayFiat,
+  onDisplayFiatChange,
 }: AppHeaderProps) {
-  const {
-    currentBalance,
-    currentFormattedAmount,
-    items,
-    onSelectBalance,
-    displayFiat,
-    onDisplayFiatChange,
-  } = useAppHeaderState();
   const { mobileMenuOpen, toggleMobileMenu } = useAppLayoutState();
 
   return (
@@ -60,7 +68,7 @@ export function AppHeader({
         onSelectBalance={onSelectBalance}
         displayFiat={displayFiat}
         onDisplayFiatChange={onDisplayFiatChange}
-        labels={APP_HEADER_CASHIER_LABELS}
+        labels={CASHIER_DROPDOWN_LABELS}
       />
     </header>
   );

@@ -21,7 +21,7 @@ function OriginalsGameShellExample({ theatreMode = false }: { theatreMode?: bool
   return (
     <div
       className={cn(
-        'bg-ds-black p-ds-4 md:p-ds-8 w-full',
+        'bg-ds-black px-ds-4 py-ds-2 md:px-ds-8 md:py-ds-4 w-full',
         isTheatreMode ? 'h-dvh' : 'min-h-screen',
       )}
     >

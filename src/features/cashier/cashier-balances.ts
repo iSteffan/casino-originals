@@ -3,7 +3,8 @@ import type {
   CashierCurrencyId,
 } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
 
-export const APP_HEADER_BALANCES: readonly CashierBalance[] = [
+/** Demo cashier currencies shared by wallet, header, and sidebar editor. */
+export const CASHIER_BALANCES: readonly CashierBalance[] = [
   {
     id: 'btc',
     label: 'BTC',
@@ -23,7 +24,7 @@ export const APP_HEADER_BALANCES: readonly CashierBalance[] = [
 
 export type { CashierCurrencyId };
 
-export const APP_HEADER_CASHIER_LABELS = {
+export const CASHIER_DROPDOWN_LABELS = {
   menu: 'Balances',
   displayInFiat: 'Display in Fiat',
 };

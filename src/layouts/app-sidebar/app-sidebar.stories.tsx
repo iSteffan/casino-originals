@@ -6,7 +6,10 @@ import { useArgs } from 'storybook/preview-api';
 import { AppSidebar } from './app-sidebar';
 import { APP_SIDEBAR_GAMES } from './app-sidebar-games';
 
+import { useWallet } from '#ui/features/wallet/wallet-provider';
+
 function AppSidebarPlayground() {
+  const wallet = useWallet();
   const [{ expanded, activeHref }, updateArgs] = useArgs<{
     expanded: boolean;
     activeHref?: string;
@@ -17,6 +20,8 @@ function AppSidebarPlayground() {
       activeHref={activeHref}
       expanded={expanded}
       onToggle={() => updateArgs({ expanded: !expanded })}
+      balances={wallet.balances}
+      setBalance={wallet.setBalance}
       className="ds-app-sidebar-story min-h-dvh"
     />
   );

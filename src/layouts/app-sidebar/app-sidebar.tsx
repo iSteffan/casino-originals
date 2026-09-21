@@ -3,6 +3,7 @@
 import { APP_SIDEBAR_GAMES } from './app-sidebar-games';
 import { AppSidebarCashier } from './app-sidebar-cashier';
 
+import type { CashierCurrencyId } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
 import { SideMenuGameList } from '#ui/layouts/side-menu/side-menu-game-list';
 import { cn } from '#ui/lib/cn';
 import { Button } from '#ui/primitives/actions/button/button';
@@ -17,6 +18,8 @@ interface AppSidebarProps {
   navigate?: boolean;
   id?: string;
   className?: string;
+  balances: Record<CashierCurrencyId, string>;
+  setBalance: (currencyId: CashierCurrencyId, cryptoAmount: string) => void;
 }
 
 export function AppSidebar({
@@ -28,6 +31,8 @@ export function AppSidebar({
   navigate = false,
   id = 'app-side-menu',
   className,
+  balances,
+  setBalance,
 }: AppSidebarProps) {
   const contentExpanded = expanded || mobileOpen;
 
@@ -66,7 +71,7 @@ export function AppSidebar({
                 navigate={navigate}
               />
             </div>
-            <AppSidebarCashier />
+            <AppSidebarCashier balances={balances} setBalance={setBalance} />
           </div>
         </div>
 

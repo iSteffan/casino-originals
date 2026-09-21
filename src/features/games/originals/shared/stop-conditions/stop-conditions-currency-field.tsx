@@ -62,13 +62,13 @@ export function StopConditionsCurrencyField({
         containerClassName="ds-originals-field ds-stop-conditions-currency-field border-transparent bg-ds-surface-tertiary h-8 py-0"
         className={cn(
           'text-ds-body-lg font-ds-medium',
-          !disabled && (hasValue ? 'text-ds-text-primary' : 'text-ds-text-secondary'),
+          !disabled && (hasValue ? 'text-ds-text-primary' : 'text-ds-text-tertiary'),
         )}
         leading={
           <span
             className={cn(
               'text-ds-body-lg group-data-[disabled]:text-ds-text-tertiary shrink-0',
-              !disabled && (hasValue ? 'text-ds-text-primary' : 'text-ds-text-secondary'),
+              !disabled && (hasValue ? 'text-ds-text-primary' : 'text-ds-text-tertiary'),
             )}
           >
             $

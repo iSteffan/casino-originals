@@ -362,6 +362,7 @@ export function CoinflipPage() {
   const placeManualBet = () => {
     const current = stateRef.current;
     if (current.mode !== "manual" || current.isVideoPlaying) return;
+    if (!new BigNumber(current.betAmount).gt(0)) return;
     if (!wallet.canAfford(current.betAmount)) return;
     startFlip(current.betAmount, false);
   };
@@ -371,6 +372,8 @@ export function CoinflipPage() {
     if (
       current.isVideoPlaying ||
       current.mode !== "auto" ||
+      !new BigNumber(current.betAmount).gt(0) ||
+      !wallet.canAfford(current.betAmount) ||
       getConfiguredMaxRounds(current.rounds) <= 0
     ) {
       return;
@@ -418,7 +421,7 @@ export function CoinflipPage() {
 
   const stopAutoBet = () => {
     const current = stateRef.current;
-    if (!isAutobetActive(current.auto)) return;
+    if (current.auto.kind !== "running") return;
     const next = { ...current, auto: { kind: "stopping" as const } };
     stateRef.current = next;
     setState(next);
@@ -506,8 +509,8 @@ export function CoinflipPage() {
     commitCryptoValue: commitCryptoBetAmount,
   });
 
-  const exceedsWallet =
-    new BigNumber(state.betAmount).gt(0) && !wallet.canAfford(state.betAmount);
+  const hasStake = new BigNumber(state.betAmount).gt(0);
+  const exceedsWallet = hasStake && !wallet.canAfford(state.betAmount);
   const showThresholdWarning = getFiatStakeUsd(
     state.betAmount,
     wallet.currencyId,
@@ -582,11 +585,13 @@ export function CoinflipPage() {
       manualActionLabel: "Place Bet",
       autoActionLabel: autobetAction.label,
       autoActionVariant: autobetAction.variant,
-      manualActionDisabled: exceedsWallet,
+      manualActionDisabled: !hasStake || exceedsWallet,
       manualActionPending: state.isVideoPlaying,
       autoActionDisabled:
+        state.auto.kind === "stopping" ||
         (state.isVideoPlaying && autobetAction.variant !== "stop") ||
-        (autobetAction.variant === "start" && exceedsWallet),
+        (autobetAction.variant === "start" &&
+          (!hasStake || exceedsWallet || maxRounds <= 0)),
       theatreMode: theatreLayoutActive,
       onManualAction: placeManualBet,
       onAutoAction: handleAutoAction,
@@ -689,7 +694,7 @@ export function CoinflipPage() {
   return (
     <div
       className={cn(
-        "bg-ds-black p-ds-4 md:p-ds-8 w-full",
+        "bg-ds-black px-ds-4 py-ds-2 md:px-ds-8 md:py-ds-4 w-full",
         theatreLayoutActive ? "h-full min-h-0 overflow-hidden" : "min-h-0 flex-1",
       )}
     >

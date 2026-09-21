@@ -7,21 +7,21 @@ import { CashierDropdown } from './cashier-dropdown';
 import type { CashierCurrencyId } from './cashier-dropdown.types';
 
 import {
+  CASHIER_BALANCES,
+  CASHIER_DROPDOWN_LABELS,
+} from '#ui/features/cashier/cashier-balances';
+import {
   formatWalletAmount,
   formatWalletAmountLabel,
   INITIAL_WALLET_BALANCES,
 } from '#ui/features/wallet/wallet-balances';
-import {
-  APP_HEADER_BALANCES,
-  APP_HEADER_CASHIER_LABELS,
-} from '#ui/layouts/app-header/app-header-balances';
 
 function CashierDropdownPlayground() {
   const [currencyId, setCurrencyId] = useState<CashierCurrencyId>('btc');
   const [displayFiat, setDisplayFiat] = useState(false);
   const currentBalance =
-    APP_HEADER_BALANCES.find((balance) => balance.id === currencyId) ??
-    APP_HEADER_BALANCES[0];
+    CASHIER_BALANCES.find((balance) => balance.id === currencyId) ??
+    CASHIER_BALANCES[0];
 
   return (
     <CashierDropdown
@@ -31,7 +31,7 @@ function CashierDropdownPlayground() {
         currentBalance.id,
         displayFiat,
       )}
-      items={APP_HEADER_BALANCES.map((balance) => ({
+      items={CASHIER_BALANCES.map((balance) => ({
         balance,
         formattedAmount: formatWalletAmountLabel(
           formatWalletAmount(INITIAL_WALLET_BALANCES[balance.id], balance.id, displayFiat),
@@ -40,7 +40,7 @@ function CashierDropdownPlayground() {
       onSelectBalance={(balance) => setCurrencyId(balance.id)}
       displayFiat={displayFiat}
       onDisplayFiatChange={setDisplayFiat}
-      labels={APP_HEADER_CASHIER_LABELS}
+      labels={CASHIER_DROPDOWN_LABELS}
       defaultOpen
     />
   );
