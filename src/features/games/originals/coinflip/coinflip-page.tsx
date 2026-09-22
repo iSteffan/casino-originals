@@ -684,6 +684,7 @@ export function CoinflipPage() {
         multiplierLabel="Multiplier"
         multiplier={state.winMultiplier}
         formattedWinAmount={state.winAmount}
+        volume={state.volume}
         currencyIcon={
           <CurrencyIcon src={wallet.currentBalance.icon} size={32} />
         }
@@ -704,55 +705,67 @@ export function CoinflipPage() {
       />
       <div
         className={cn(
-          "mx-auto flex w-full min-w-0 flex-col transition-[max-width] duration-ds-slow ease-ds-standard",
+          "relative flex w-full min-w-0 flex-col",
           theatreLayoutActive && "h-full min-h-0",
-          theatreModeActive ? "max-w-[1750px]" : "max-w-[1400px]",
         )}
       >
-        <OriginalsGameShell
-          header={
-            <GameHeader
-              title="Coinflip"
-              onBackClick={() => undefined}
-              showVolumeControl
-              volume={state.volume}
-              onVolumeChange={(volume) => patchState({ volume })}
-              isTheatreMode={state.theatreMode}
-              onTheatreToggle={() =>
-                patchState({ theatreMode: !state.theatreMode })
-              }
-            />
-          }
-          config={
-            <CoinflipConfig
-              shell={config.shell}
-              betAmount={config.betAmount}
-              rounds={config.rounds}
-              stopConditions={config.stopConditions}
-              fieldsDisabled={config.fieldsDisabled}
-              selectSide={config.selectSide}
-              turboMode={config.turboMode}
-            />
-          }
-          board={
-            <CoinflipBoard
-              videoSrc={board.videoSrc}
-              isVideoPlaying={board.isVideoPlaying}
-              onVideoEnd={board.onVideoEnd}
-              onPlaybackError={board.onPlaybackError}
-              theatreMode={theatreLayoutActive}
-              turboMode={board.turboMode}
-              volume={board.volume}
-              lastResults={board.lastResults}
-              lastResultsAssets={board.lastResultsAssets}
-              lastResultsLabels={board.lastResultsLabels}
-              lastResultsAriaLabel={board.lastResultsAriaLabel}
-              resultAnnouncement={board.resultAnnouncement}
-              overlay={board.overlay}
-            />
-          }
-          theatreMode={theatreLayoutActive}
-        />
+        <div
+          className={cn(
+            "mx-auto flex w-full min-w-0 flex-col transition-[max-width] duration-ds-slow ease-ds-standard",
+            theatreLayoutActive && "h-full min-h-0 flex-1",
+            theatreModeActive || theatreLayoutActive
+              ? "max-w-[1750px]"
+              : "max-w-[1400px]",
+          )}
+        >
+          <GameHeader
+            title="Coinflip"
+            onBackClick={() => undefined}
+            showVolumeControl
+            volume={state.volume}
+            onVolumeChange={(volume) => patchState({ volume })}
+            isTheatreMode={state.theatreMode}
+            onTheatreToggle={() =>
+              patchState({ theatreMode: !state.theatreMode })
+            }
+            // Reserve space so the title does not run under pinned actions.
+            className="pr-[4.5rem]"
+            // Pin volume/theatre to the main column's right edge so they do not
+            // shift when max-width changes, while the title stays with the config.
+            actionsClassName="absolute top-0 right-0 z-10 md:min-h-ds-14"
+          />
+          <OriginalsGameShell
+            config={
+              <CoinflipConfig
+                shell={config.shell}
+                betAmount={config.betAmount}
+                rounds={config.rounds}
+                stopConditions={config.stopConditions}
+                fieldsDisabled={config.fieldsDisabled}
+                selectSide={config.selectSide}
+                turboMode={config.turboMode}
+              />
+            }
+            board={
+              <CoinflipBoard
+                videoSrc={board.videoSrc}
+                isVideoPlaying={board.isVideoPlaying}
+                onVideoEnd={board.onVideoEnd}
+                onPlaybackError={board.onPlaybackError}
+                theatreMode={theatreLayoutActive}
+                turboMode={board.turboMode}
+                volume={board.volume}
+                lastResults={board.lastResults}
+                lastResultsAssets={board.lastResultsAssets}
+                lastResultsLabels={board.lastResultsLabels}
+                lastResultsAriaLabel={board.lastResultsAriaLabel}
+                resultAnnouncement={board.resultAnnouncement}
+                overlay={board.overlay}
+              />
+            }
+            theatreMode={theatreLayoutActive}
+          />
+        </div>
       </div>
     </div>
   );

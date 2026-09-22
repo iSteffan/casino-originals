@@ -1,6 +1,12 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+
 import type { GameWinModalProps } from './game-win-modal.types';
+import {
+  playGameWinModalSound,
+  preloadGameWinModalSound,
+} from './game-win-modal-sound';
 
 import { cn } from '#ui/lib/cn';
 import { GradientCard } from '#ui/primitives/data-display/gradient-card/gradient-card';
@@ -15,7 +21,22 @@ export function GameWinModal({
   currencyIcon,
   reducedMotion = false,
   contentClassName,
+  volume,
 }: GameWinModalProps) {
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (volume === undefined) return;
+    preloadGameWinModalSound();
+  }, [volume]);
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current && volume !== undefined) {
+      playGameWinModalSound(volume);
+    }
+    wasOpenRef.current = open;
+  }, [open, volume]);
+
   return (
     <>
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">

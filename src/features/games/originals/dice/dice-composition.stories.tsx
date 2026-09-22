@@ -39,6 +39,11 @@ import {
   diceStoryStopConditionsLabels,
   diceStoryWinCurrencyIcon,
   diceStoryWinModalContentClassName,
+  playDiceStorySound,
+  preloadDiceStorySounds,
+  setDiceStorySoundsVolume,
+  stopDiceStorySounds,
+  type DiceStorySoundName,
 } from '#ui/features/games/originals/dice/dice-story-helpers';
 import type {
   OriginalsConfigAutoActionVariant,
@@ -104,10 +109,22 @@ function DiceCompositionStory() {
   const [args, updateArgs] = useArgs<PlaygroundArgs>();
   const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastResultsRef = useRef(args.lastResults);
+  const volumeRef = useRef(args.volume);
+  const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
 
   useEffect(() => {
     lastResultsRef.current = args.lastResults;
   }, [args.lastResults]);
+
+  useEffect(() => {
+    preloadDiceStorySounds();
+    return () => stopDiceStorySounds(activeSoundsRef.current);
+  }, []);
+
+  useEffect(() => {
+    volumeRef.current = args.volume;
+    setDiceStorySoundsVolume(activeSoundsRef.current, args.volume);
+  }, [args.volume]);
 
   useEffect(
     () => () => {
@@ -117,6 +134,13 @@ function DiceCompositionStory() {
     },
     [],
   );
+
+  const playSound = (name: DiceStorySoundName) => {
+    const audio = playDiceStorySound(name, volumeRef.current, (settled) => {
+      activeSoundsRef.current.delete(settled);
+    });
+    if (audio) activeSoundsRef.current.add(audio);
+  };
 
   const rtpValue = normalizeDiceRtp(args.rtp);
 
@@ -133,12 +157,18 @@ function DiceCompositionStory() {
     winChance: number;
     multiplier: number;
   }) => {
+    const changed =
+      (linked.direction !== undefined && linked.direction !== args.direction) ||
+      linked.displayValue !== args.displayValue ||
+      linked.winChance !== args.winChance ||
+      linked.multiplier !== args.multiplier;
     updateArgs({
       ...(linked.direction ? { direction: linked.direction } : {}),
       displayValue: linked.displayValue,
       winChance: linked.winChance,
       multiplier: linked.multiplier,
     });
+    if (changed) playSound('scroll');
   };
 
   const updateBetAmount = (factor: number) => {
@@ -175,6 +205,8 @@ function DiceCompositionStory() {
       });
       settleTimeoutRef.current = null;
     };
+
+    playSound('roll');
 
     if (args.reducedMotion || shouldReduceMotion()) {
       const result = createDiceStoryLastResult(targetValue, isWin ? 'green' : 'red');
@@ -362,6 +394,7 @@ function DiceCompositionStory() {
                   formattedWinAmount={args.winAmount}
                   currencyIcon={diceStoryWinCurrencyIcon}
                   contentClassName={diceStoryWinModalContentClassName}
+                  volume={args.volume}
                 />
               }
             />

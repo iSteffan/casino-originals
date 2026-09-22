@@ -314,7 +314,6 @@ function TowersCompositionStory() {
         gridConfig,
         args.betAmount,
       );
-      playSound('win');
       setResultAnnouncement(undefined);
       setWinResult(result);
       setIsWin(true);
@@ -345,7 +344,6 @@ function TowersCompositionStory() {
       const result = getWinResultFromPicks(picks, gridConfig, args.betAmount);
       window.clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = undefined;
-      playSound('win');
       setResultAnnouncement(undefined);
       setWinResult(result);
       setIsWin(true);
@@ -525,6 +523,7 @@ function TowersCompositionStory() {
                 formattedWinAmount={winResult?.amount ?? '0.00'}
                 currencyIcon={towersStoryWinCurrencyIcon}
                 reducedMotion={effectiveReducedMotion}
+                volume={args.volume}
               />
             </div>
           }

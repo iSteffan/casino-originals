@@ -258,6 +258,7 @@ function CoinflipCompositionStory() {
         multiplier={args.winMultiplier}
         formattedWinAmount={args.winAmount}
         currencyIcon={coinflipStoryWinCurrencyIcon}
+        volume={args.volume}
       />
     ),
   } satisfies CoinflipBoardProps;

@@ -328,6 +328,7 @@ function KenoCompositionStory() {
         multiplier={args.winMultiplier}
         formattedWinAmount={args.winAmount}
         currencyIcon={kenoStoryWinCurrencyIcon}
+        volume={args.volume}
       />
     ),
     onCellClick: (number) => {

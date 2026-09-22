@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { CoinflipPage } from '#ui/features/games/originals/coinflip/coinflip-page';
+import { DicePage } from '#ui/features/games/originals/dice/dice-page';
 import { APP_SIDEBAR_GAMES } from '#ui/layouts/app-sidebar/app-sidebar-games';
 
 const GAME_PAGES = {
   coinflip: CoinflipPage,
+  dice: DicePage,
 } as const;
 
 type GameSlug = (typeof APP_SIDEBAR_GAMES)[number]['id'];

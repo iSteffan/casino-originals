@@ -10,4 +10,6 @@ export type GameWinModalProps = {
   currencyIcon?: ReactNode;
   reducedMotion?: boolean;
   contentClassName?: string;
+  /** Master volume 0–1. When set, plays the shared win-modal cue on open. */
+  volume?: number;
 };

@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect } from "react";
 
-import { AppHeader } from './app-header';
-import { AppLayoutProvider, useAppLayoutState } from './app-layout-provider';
+import { AppHeader } from "./app-header";
+import { AppLayoutProvider, useAppLayoutState } from "./app-layout-provider";
 
-import { useWallet } from '#ui/features/wallet/wallet-provider';
-import { AppSidebar } from '#ui/layouts/app-sidebar/app-sidebar';
-import { cn } from '#ui/lib/cn';
+import { useWallet } from "#ui/features/wallet/wallet-provider";
+import { AppSidebar } from "#ui/layouts/app-sidebar/app-sidebar";
+import { cn } from "#ui/lib/cn";
 
-const APP_SIDE_MENU_ID = 'app-side-menu';
+const APP_SIDE_MENU_ID = "app-side-menu";
 
 interface AppHeaderShellProps {
   children: ReactNode;
@@ -71,8 +71,10 @@ function AppHeaderShellFrame({
         ) : null}
         <div
           className={cn(
-            'bg-ds-black flex min-h-0 min-w-0 flex-1 flex-col',
-            theatreLayoutActive ? 'overflow-hidden' : 'overflow-y-auto',
+            "bg-ds-black flex min-h-0 min-w-0 flex-1 flex-col",
+            theatreLayoutActive ? "overflow-hidden" : "overflow-y-auto",
+            // Avoid a horizontal jump when the scrollbar appears after theatre exit.
+            "[scrollbar-gutter:stable]",
           )}
         >
           {children}

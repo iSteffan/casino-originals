@@ -36,6 +36,8 @@ type GameHeaderProps = {
   onFairnessClick?: () => void;
   fairnessLabel?: string;
   className?: string;
+  /** Applied to the trailing actions cluster (volume, theatre, etc.). */
+  actionsClassName?: string;
 };
 
 function BackControl({
@@ -108,6 +110,7 @@ export function GameHeader({
   onFairnessClick,
   fairnessLabel = 'Provably fair',
   className,
+  actionsClassName,
 }: GameHeaderProps) {
   const hasActions = Boolean(
     onFavoriteClick ||
@@ -146,8 +149,12 @@ export function GameHeader({
       </div>
 
       {hasActions ? (
-        <div className="gap-ds-2 flex shrink-0 items-center justify-end">
-          {showVolumeControl && onVolumeChange ? (
+        <div
+          className={cn(
+            'gap-ds-2 flex shrink-0 items-center justify-end',
+            actionsClassName,
+          )}
+        >          {showVolumeControl && onVolumeChange ? (
             <GamesVolume volume={volume} onVolumeChange={onVolumeChange} />
           ) : null}
 

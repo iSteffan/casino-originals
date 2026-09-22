@@ -85,6 +85,84 @@ export const diceStoryLastResultsAriaLabel = 'Dice last results';
 /** Legacy dice board offset: modal sits above the slider, not centered on it. */
 export const diceStoryWinModalContentClassName = 'translate-y-[-170%]';
 
+const DICE_STORY_SOUNDS = {
+  scroll: { src: '/sounds/games/dice/odds_scroll.wav', gain: 0.1 },
+  roll: { src: '/sounds/games/dice/roll.wav', gain: 0.1 },
+} as const;
+
+export type DiceStorySoundName = keyof typeof DICE_STORY_SOUNDS;
+
+const diceStorySoundTemplates = new Map<string, HTMLAudioElement>();
+const diceStorySoundGains = new WeakMap<HTMLAudioElement, number>();
+
+function getDiceStorySoundTemplate(src: string): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+
+  const cached = diceStorySoundTemplates.get(src);
+  if (cached) return cached;
+
+  const template = new Audio(src);
+  template.preload = 'auto';
+  diceStorySoundTemplates.set(src, template);
+  return template;
+}
+
+export function preloadDiceStorySounds(): void {
+  Object.values(DICE_STORY_SOUNDS).forEach((entry) => {
+    getDiceStorySoundTemplate(entry.src);
+  });
+}
+
+function getSafeDiceMasterVolume(volume: number): number {
+  return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1;
+}
+
+function getSafeDiceStorySoundVolume(volume: number, gain: number): number {
+  const safeGain = Number.isFinite(gain) ? Math.min(1, Math.max(0, gain)) : 1;
+  return getSafeDiceMasterVolume(volume) * safeGain;
+}
+
+export function setDiceStorySoundsVolume(
+  sounds: Iterable<HTMLAudioElement>,
+  volume: number,
+): void {
+  const master = getSafeDiceMasterVolume(volume);
+  for (const sound of sounds) {
+    const gain = diceStorySoundGains.get(sound) ?? 1;
+    sound.volume = master * gain;
+  }
+}
+
+export function stopDiceStorySounds(sounds: Set<HTMLAudioElement>): void {
+  for (const sound of sounds) {
+    sound.pause();
+    sound.currentTime = 0;
+  }
+  sounds.clear();
+}
+
+export function playDiceStorySound(
+  name: DiceStorySoundName,
+  volume: number,
+  onSettled?: (audio: HTMLAudioElement) => void,
+): HTMLAudioElement | null {
+  const entry = DICE_STORY_SOUNDS[name];
+  const safeVolume = getSafeDiceStorySoundVolume(volume, entry.gain);
+  if (safeVolume <= 0) return null;
+
+  const template = getDiceStorySoundTemplate(entry.src);
+  if (!template) return null;
+
+  const audio = template.cloneNode(true) as HTMLAudioElement;
+  const settle = () => onSettled?.(audio);
+  diceStorySoundGains.set(audio, entry.gain);
+  audio.volume = safeVolume;
+  audio.addEventListener('ended', settle, { once: true });
+  audio.addEventListener('error', settle, { once: true });
+  void audio.play().catch(settle);
+  return audio;
+}
+
 export function createDiceStoryLastResult(
   value: number,
   color: DiceLastResultColor,
