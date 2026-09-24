@@ -210,6 +210,23 @@ export function createMinesStoryAnnouncement(message: string) {
   return { id, message };
 }
 
+export function createRandomMinesMineIndexes(
+  gridSize: MinesGridSize,
+  numberOfMines: number,
+): number[] {
+  const cellCount = getMinesGridCellCount(gridSize);
+  const mineCount = Math.min(Math.max(numberOfMines, 1), cellCount - 1);
+  const indexes = Array.from({ length: cellCount }, (_, index) => index);
+
+  for (let index = cellCount - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const current = indexes[index]!;
+    indexes[index] = indexes[swapIndex]!;
+    indexes[swapIndex] = current;
+  }
+
+  return indexes.slice(0, mineCount).sort((left, right) => left - right);
+}
 export function createMinesStoryMineIndexes(
   gridSize: MinesGridSize,
   numberOfMines: number,
@@ -228,7 +245,7 @@ export function createMinesStoryMineIndexes(
   return indexes.slice(0, mineCount).sort((left, right) => left - right);
 }
 
-/** Legacy manual `mines:end` → `clearBoard(true)` delay. */
+/** Legacy manual `mines:end` в†’ `clearBoard(true)` delay. */
 export const MINES_STORY_BOARD_CLEAR_DELAY_MS = 2000;
 
 /** Gap after board clear before the next autobet round (legacy next-bet chain). */

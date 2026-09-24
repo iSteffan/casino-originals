@@ -4,12 +4,14 @@ import { notFound } from 'next/navigation';
 import { CoinflipPage } from '#ui/features/games/originals/coinflip/coinflip-page';
 import { DicePage } from '#ui/features/games/originals/dice/dice-page';
 import { KenoPage } from '#ui/features/games/originals/keno/keno-page';
+import { MinesPage } from '#ui/features/games/originals/mines/mines-page';
 import { APP_SIDEBAR_GAMES } from '#ui/layouts/app-sidebar/app-sidebar-games';
 
 const GAME_PAGES = {
   coinflip: CoinflipPage,
   dice: DicePage,
   keno: KenoPage,
+  mines: MinesPage,
 } as const;
 
 type GameSlug = (typeof APP_SIDEBAR_GAMES)[number]['id'];
@@ -33,7 +35,7 @@ export async function generateMetadata({
   return {
     title: item ? `${item.label} | Casino Originals` : 'Casino Originals',
     description: item
-      ? `Play ${item.label} — frontend originals demo`
+      ? `Play ${item.label} вЂ” frontend originals demo`
       : 'Frontend-only originals games demo',
   };
 }
