@@ -481,6 +481,74 @@ export const towersStoryWinCurrencyIcon: ReactNode = (
   />
 );
 
+
+export const TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS = 500;
+export const TOWERS_STORY_AUTOBET_NEXT_ROUND_DELAY_MS = 300;
+
+export function getTowersStoryMultiplierValue(
+  config: TowersStoryGridConfig,
+  rowIndex: number,
+): number {
+  if (rowIndex < 0) return 0;
+  return computeMultiplier(config.cols, config.trapsPerRow, rowIndex);
+}
+
+export function createTowersStoryAnnouncement(message: string): {
+  id: string;
+  message: string;
+} {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    message,
+  };
+}
+
+/** Fisher-Yates pick of trap column indexes per row for a live round. */
+export function createRandomTowersTrapColumns(
+  config: TowersStoryGridConfig,
+): number[][] {
+  return Array.from({ length: config.rows }, () => {
+    const indexes = Array.from({ length: config.cols }, (_, index) => index);
+    for (let i = indexes.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const left = indexes[i]!;
+      indexes[i] = indexes[j]!;
+      indexes[j] = left;
+    }
+    return indexes.slice(0, config.trapsPerRow).sort((a, b) => a - b);
+  });
+}
+
+export function createTowersEmptyMatrix(
+  config: TowersStoryGridConfig,
+): (boolean | null)[][] {
+  return Array.from({ length: config.rows }, () =>
+    Array.from({ length: config.cols }, () => null),
+  );
+}
+
+export function revealTowersRowValues(
+  trapColumns: readonly (readonly number[])[],
+  rowIndex: number,
+  columnCount: number,
+): boolean[] {
+  const traps = new Set(trapColumns[rowIndex] ?? []);
+  return Array.from({ length: columnCount }, (_, columnIndex) =>
+    traps.has(columnIndex),
+  );
+}
+
+export function toTowersPotentialWin(parts: {
+  prefix?: string;
+  whole: string;
+  fraction?: string;
+}): { whole: string; fraction: string } {
+  return {
+    whole: `${parts.prefix ?? ''}${parts.whole}`,
+    fraction: (parts.fraction ?? '.00').replace(/^\./, ''),
+  };
+}
+
 const TOWERS_STORY_SOUNDS = {
   win: '/sounds/games/towers/win.wav',
   lose: '/sounds/games/towers/lose.wav',

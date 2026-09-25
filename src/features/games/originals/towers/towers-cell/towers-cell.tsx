@@ -13,7 +13,14 @@ import { cn } from '#ui/lib/cn';
 import { Typography } from '#ui/primitives/foundation/typography/typography';
 
 function isTowersCellSelectable(state: TowersCellState): boolean {
-  return state === 'active' || state === 'auto-selected' || state === 'auto-selectable';
+  // `idle` is included so Auto path-edit siblings in a filled row stay clickable
+  // without the auto-selectable pulse mark (controller sets disabled=false there).
+  return (
+    state === 'active' ||
+    state === 'auto-selected' ||
+    state === 'auto-selectable' ||
+    state === 'idle'
+  );
 }
 
 function TowersCellShell({

@@ -5,6 +5,7 @@ import { CoinflipPage } from '#ui/features/games/originals/coinflip/coinflip-pag
 import { DicePage } from '#ui/features/games/originals/dice/dice-page';
 import { KenoPage } from '#ui/features/games/originals/keno/keno-page';
 import { MinesPage } from '#ui/features/games/originals/mines/mines-page';
+import { TowersPage } from '#ui/features/games/originals/towers/towers-page';
 import { APP_SIDEBAR_GAMES } from '#ui/layouts/app-sidebar/app-sidebar-games';
 
 const GAME_PAGES = {
@@ -12,6 +13,7 @@ const GAME_PAGES = {
   dice: DicePage,
   keno: KenoPage,
   mines: MinesPage,
+  towers: TowersPage,
 } as const;
 
 type GameSlug = (typeof APP_SIDEBAR_GAMES)[number]['id'];
