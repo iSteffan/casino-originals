@@ -6,12 +6,17 @@ import BigNumber from 'bignumber.js';
 
 import { CASHIER_BALANCES } from '#ui/features/cashier/cashier-balances';
 import type { CashierCurrencyId } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
+import {
+  cryptoToFiatAmount,
+  fiatToCryptoAmount,
+  WALLET_FIAT_FRACTION_DIGITS,
+} from '#ui/features/wallet/wallet-balances';
 import { cn } from '#ui/lib/cn';
 import { Button } from '#ui/primitives/actions/button/button';
 import { Image } from '#ui/primitives/data-display/image/image';
 import { Icon } from '#ui/primitives/foundation/icon/icon';
 import { Typography } from '#ui/primitives/foundation/typography/typography';
-import { Input } from '#ui/primitives/inputs/input/input';
+import { Input, InputPrefix } from '#ui/primitives/inputs/input/input';
 import {
   Popover,
   PopoverContent,
@@ -32,6 +37,11 @@ function CurrencyIcon({ src }: { src: string }) {
   );
 }
 
+function fiatDraftFromCrypto(cryptoAmount: string, currencyId: CashierCurrencyId) {
+  const fiat = cryptoToFiatAmount(cryptoAmount, currencyId);
+  return fiat === '' ? '0' : fiat;
+}
+
 interface AppSidebarCashierProps {
   className?: string;
   balances: Record<CashierCurrencyId, string>;
@@ -44,7 +54,9 @@ export function AppSidebarCashier({
   setBalance,
 }: AppSidebarCashierProps) {
   const [currencyId, setCurrencyId] = useState<CashierCurrencyId>('btc');
-  const [draft, setDraft] = useState(() => balances.btc);
+  const [draft, setDraft] = useState(() =>
+    fiatDraftFromCrypto(balances.btc, 'btc'),
+  );
   const [menuOpen, setMenuOpen] = useState(false);
 
   const selected =
@@ -52,14 +64,19 @@ export function AppSidebarCashier({
     CASHIER_BALANCES[0];
 
   useEffect(() => {
-    setDraft(balances[currencyId]);
+    setDraft(fiatDraftFromCrypto(balances[currencyId], currencyId));
   }, [balances, currencyId]);
 
   const applyDraft = () => {
-    const next = new BigNumber(draft.trim() || 0);
-    if (!next.isFinite() || next.lt(0)) return;
-    setBalance(currencyId, next.toFixed());
-    setDraft(next.toFixed());
+    const nextFiat = new BigNumber(draft.trim() || 0);
+    if (!nextFiat.isFinite() || nextFiat.lt(0)) return;
+
+    const normalizedFiat = nextFiat.toFixed(WALLET_FIAT_FRACTION_DIGITS);
+    const cryptoConverted = fiatToCryptoAmount(normalizedFiat, currencyId);
+    const cryptoAmount = cryptoConverted === '' ? '0' : cryptoConverted;
+
+    setBalance(currencyId, cryptoAmount);
+    setDraft(fiatDraftFromCrypto(cryptoAmount, currencyId));
   };
 
   const resetBalance = () => {
@@ -78,8 +95,8 @@ export function AppSidebarCashier({
         Cashier
       </Typography>
       <Typography kind="tertiary-12-400" as="p" className="m-0 px-ds-1">
-        Demo balance editor. Set a currency amount to use when placing bets in the
-        header cashier.
+        Demo balance editor. Enter a USD amount for the selected currency; it is
+        converted to crypto for bets in the header cashier.
       </Typography>
 
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -147,7 +164,8 @@ export function AppSidebarCashier({
         inputMode="decimal"
         autoComplete="off"
         spellCheck={false}
-        aria-label={`${selected.label} balance`}
+        aria-label={`${selected.label} balance in USD`}
+        leading={<InputPrefix>$</InputPrefix>}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
@@ -171,3 +189,4 @@ export function AppSidebarCashier({
 }
 
 export type { AppSidebarCashierProps };
+

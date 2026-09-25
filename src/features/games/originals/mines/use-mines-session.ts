@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import BigNumber from 'bignumber.js';
+import BigNumber from "bignumber.js";
 
 import {
   canContinueAutobet,
@@ -14,9 +14,9 @@ import {
   type OriginalStopConditions,
   prepareAutobetEdit,
   settleAutobetRound,
-} from '#ui/features/games/originals/core/originals-autobet';
-import type { MinesGridSizeValue } from '#ui/features/games/originals/mines/mines-config/mines-config.utils';
-import type { MinesGridCell } from '#ui/features/games/originals/mines/mines-grid/mines-grid.types';
+} from "#ui/features/games/originals/core/originals-autobet";
+import type { MinesGridSizeValue } from "#ui/features/games/originals/mines/mines-config/mines-config.utils";
+import type { MinesGridCell } from "#ui/features/games/originals/mines/mines-grid/mines-grid.types";
 import {
   applyMinesStorySelection,
   countMinesStorySafeRevealed,
@@ -35,16 +35,16 @@ import {
   setMinesStorySoundsVolume,
   stopMinesStorySounds,
   type MinesStorySoundName,
-} from '#ui/features/games/originals/mines/mines-story-helpers';
-import type { OriginalsConfigMode } from '#ui/features/games/originals/originals-config/originals-config.types';
+} from "#ui/features/games/originals/mines/mines-story-helpers";
+import type { OriginalsConfigMode } from "#ui/features/games/originals/originals-config/originals-config.types";
 import {
   formatWalletAmount,
   formatWalletAmountLabel,
   getCryptoStakeFloorRate,
   WALLET_CRYPTO_FRACTION_DIGITS,
-} from '#ui/features/wallet/wallet-balances';
-import { useWallet } from '#ui/features/wallet/wallet-provider';
-import { shouldReduceMotion } from '#ui/lib/motion';
+} from "#ui/features/wallet/wallet-balances";
+import { useWallet } from "#ui/features/wallet/wallet-provider";
+import { shouldReduceMotion } from "#ui/lib/motion";
 
 const AUTOBET_CONTINUE_DELAY_MS =
   MINES_STORY_BOARD_CLEAR_DELAY_MS + MINES_STORY_AUTOBET_NEXT_ROUND_DELAY_MS;
@@ -91,15 +91,15 @@ function getStopConditions(state: MinesSessionState): OriginalStopConditions {
 export function useMinesSession() {
   const wallet = useWallet();
   const [state, setState] = useState<MinesSessionState>(() => ({
-    mode: 'manual',
-    betAmount: '0',
-    rounds: '0',
+    mode: "manual",
+    betAmount: "0",
+    rounds: "0",
     theatreMode: false,
     volume: 0.75,
     onWinValue: 50,
     onLossValue: 50,
-    stopProfitValue: '',
-    stopLossValue: '',
+    stopProfitValue: "",
+    stopLossValue: "",
     isActiveOnWin: false,
     isActiveOnLoss: false,
     gridSize: 5,
@@ -109,11 +109,11 @@ export function useMinesSession() {
     selectedIndexes: [],
     isRoundPlaying: false,
     showWinModal: false,
-    winMultiplier: 'x0.00',
-    winAmount: '0.00',
-    auto: { kind: 'idle' },
+    winMultiplier: "x0.00",
+    winAmount: "0.00",
+    auto: { kind: "idle" },
     metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
-    initialBet: '0',
+    initialBet: "0",
   }));
 
   const stateRef = useRef(state);
@@ -171,7 +171,16 @@ export function useMinesSession() {
     boardClearTimerRef.current = window.setTimeout(() => {
       boardClearTimerRef.current = null;
       const current = stateRef.current;
-      const keepSelection = current.mode === 'auto' ? selectedIndexes : [];
+      const keepSelection = current.mode === "auto" ? selectedIndexes : [];
+      const auto =
+        current.auto.kind === "stopping"
+          ? {
+              kind:
+                current.metrics.roundsCompleted > 0
+                  ? ("paused" as const)
+                  : ("idle" as const),
+            }
+          : current.auto;
       patchState({
         cells: applyMinesStorySelection(
           createMinesGridCells(gridSize),
@@ -181,16 +190,18 @@ export function useMinesSession() {
         selectedIndexes: [...keepSelection],
         showWinModal: false,
         resultAnnouncement: undefined,
+        auto,
       });
     }, MINES_STORY_BOARD_CLEAR_DELAY_MS);
   };
 
   useEffect(() => {
     preloadMinesStorySounds();
+    const activeSounds = activeSoundsRef.current;
     return () => {
       clearBoardClearTimer();
       clearAutobetTimers();
-      stopMinesStorySounds(activeSoundsRef.current);
+      stopMinesStorySounds(activeSounds);
     };
   }, []);
 
@@ -242,7 +253,7 @@ export function useMinesSession() {
         showWinModal: false,
         resultAnnouncement: createMinesStoryAnnouncement(announcement),
         auto: auto
-          ? { kind: 'failed', reason: 'insufficient-balance' }
+          ? { kind: "failed", reason: "insufficient-balance" }
           : latest.auto,
       });
       scheduleBoardClear(latest.selectedIndexes);
@@ -273,15 +284,13 @@ export function useMinesSession() {
           metrics,
           stopConditions: getStopConditions(latest),
         },
-        '1',
+        "1",
       );
 
-      if (latest.auto.kind === 'stopping') {
-        autoStatus = {
-          kind: metrics.roundsCompleted > 0 ? 'paused' : 'idle',
-        };
+      if (latest.auto.kind === "stopping") {
+        autoStatus = { kind: "stopping" };
       } else if (!canContinue) {
-        autoStatus = { kind: 'idle' };
+        autoStatus = { kind: "idle" };
       }
     }
 
@@ -301,7 +310,7 @@ export function useMinesSession() {
 
   const startManualRound = () => {
     const current = stateRef.current;
-    if (current.isRoundPlaying || current.mode !== 'manual') return false;
+    if (current.isRoundPlaying || current.mode !== "manual") return false;
     if (!new BigNumber(current.betAmount).gt(0)) return false;
     if (!wallet.canAfford(current.betAmount)) return false;
 
@@ -319,7 +328,7 @@ export function useMinesSession() {
       isRoundPlaying: true,
       showWinModal: false,
       resultAnnouncement: createMinesStoryAnnouncement(
-        'Round started. Pick a safe tile.',
+        "Round started. Pick a safe tile.",
       ),
     });
     return true;
@@ -327,7 +336,7 @@ export function useMinesSession() {
 
   const cashout = () => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying || current.mode !== 'manual') return;
+    if (!current.isRoundPlaying || current.mode !== "manual") return;
     const revealedSafe = countMinesStorySafeRevealed(
       current.cells,
       current.mineIndexes,
@@ -343,7 +352,7 @@ export function useMinesSession() {
       .times(multiplier)
       .toFixed();
 
-    playSound('cashout');
+    playSound("cashout");
     settleFinishedRound({
       betAmount: current.betAmount,
       payoutAmount,
@@ -354,21 +363,21 @@ export function useMinesSession() {
         cells: current.cells,
         mineIndexes: current.mineIndexes,
       }),
-      announcement: 'Cashed out.',
+      announcement: "Cashed out.",
     });
   };
 
   const revealManualCell = (index: number) => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying || current.mode !== 'manual') return;
+    if (!current.isRoundPlaying || current.mode !== "manual") return;
     const cell = current.cells[index];
     if (!cell || cell.revealed || cell.disabled) return;
 
     if (current.mineIndexes.includes(index)) {
-      playSound('mine');
+      playSound("mine");
       settleFinishedRound({
         betAmount: current.betAmount,
-        payoutAmount: '0',
+        payoutAmount: "0",
         multiplier: 0,
         isWin: false,
         auto: false,
@@ -377,7 +386,7 @@ export function useMinesSession() {
           mineIndexes: current.mineIndexes,
           hitIndex: index,
         }),
-        announcement: 'Mine hit. Round lost.',
+        announcement: "Mine hit. Round lost.",
       });
       return;
     }
@@ -393,13 +402,10 @@ export function useMinesSession() {
       cellIndex === index
         ? {
             revealed: true,
-            content: 'safe' as const,
-            revealStyle: 'player' as const,
+            content: "safe" as const,
+            revealStyle: "player" as const,
             selected: false,
-            cashoutLabel: formatCellCashoutLabel(
-              current.betAmount,
-              multiplier,
-            ),
+            cashoutLabel: formatCellCashoutLabel(current.betAmount, multiplier),
             disabled: false,
           }
         : entry,
@@ -409,13 +415,13 @@ export function useMinesSession() {
     const safeCellCount = totalCells - current.mineIndexes.length;
     const clearedBoard = revealedSafe >= safeCellCount;
 
-    playSound('cell');
+    playSound("cell");
 
     if (clearedBoard) {
       const payoutAmount = new BigNumber(current.betAmount)
         .times(multiplier)
         .toFixed();
-      playSound('cashout');
+      playSound("cashout");
       settleFinishedRound({
         betAmount: current.betAmount,
         payoutAmount,
@@ -426,21 +432,21 @@ export function useMinesSession() {
           cells: nextCells,
           mineIndexes: current.mineIndexes,
         }),
-        announcement: 'All safe tiles cleared.',
+        announcement: "All safe tiles cleared.",
       });
       return;
     }
 
     patchState({
       cells: nextCells,
-      resultAnnouncement: createMinesStoryAnnouncement('Safe tile revealed.'),
+      resultAnnouncement: createMinesStoryAnnouncement("Safe tile revealed."),
     });
   };
 
   const toggleAutoSelection = (index: number) => {
     const current = stateRef.current;
     if (
-      current.mode !== 'auto' ||
+      current.mode !== "auto" ||
       current.isRoundPlaying ||
       isAutobetActive(current.auto)
     ) {
@@ -460,44 +466,44 @@ export function useMinesSession() {
 
   const clickCell = (index: number) => {
     const current = stateRef.current;
-    if (current.mode === 'auto' && !current.isRoundPlaying) {
+    if (current.mode === "auto" && !current.isRoundPlaying) {
       toggleAutoSelection(index);
       return;
     }
     revealManualCell(index);
   };
 
-  const runAutoRound = useEffectEvent(() => {
+  const runAutoRound = () => {
     const current = stateRef.current;
     const stopConditions = getStopConditions(current);
 
     if (
       !canContinueAutobet(
         { rounds: current.rounds, metrics: current.metrics, stopConditions },
-        '1',
+        "1",
       )
     ) {
-      patchState({ auto: { kind: 'idle' } });
+      patchState({ auto: { kind: "idle" } });
       return;
     }
 
-    if (current.auto.kind === 'stopping') {
+    if (current.auto.kind === "stopping") {
       patchState({
         auto: {
-          kind: current.metrics.roundsCompleted > 0 ? 'paused' : 'idle',
+          kind: current.metrics.roundsCompleted > 0 ? "paused" : "idle",
         },
       });
       return;
     }
 
-    if (current.auto.kind !== 'running') return;
+    if (current.auto.kind !== "running") return;
     if (current.selectedIndexes.length === 0) {
-      patchState({ auto: { kind: 'idle' } });
+      patchState({ auto: { kind: "idle" } });
       return;
     }
     if (!wallet.canAfford(current.betAmount)) {
       patchState({
-        auto: { kind: 'failed', reason: 'insufficient-balance' },
+        auto: { kind: "failed", reason: "insufficient-balance" },
       });
       return;
     }
@@ -523,7 +529,7 @@ export function useMinesSession() {
       isRoundPlaying: true,
       showWinModal: false,
       resultAnnouncement: createMinesStoryAnnouncement(
-        'Autobet round started.',
+        "Autobet round started.",
       ),
     });
 
@@ -531,7 +537,7 @@ export function useMinesSession() {
       () => {
         if (autobetGenerationRef.current !== generation) return;
         const latest = stateRef.current;
-        if (latest.auto.kind !== 'running' && latest.auto.kind !== 'stopping') {
+        if (latest.auto.kind !== "running" && latest.auto.kind !== "stopping") {
           patchState({ isRoundPlaying: false });
           return;
         }
@@ -543,10 +549,10 @@ export function useMinesSession() {
         );
 
         if (hitIndex !== undefined) {
-          playSound('mine');
+          playSound("mine");
           settleFinishedRound({
             betAmount,
-            payoutAmount: '0',
+            payoutAmount: "0",
             multiplier: 0,
             isWin: false,
             auto: true,
@@ -555,7 +561,7 @@ export function useMinesSession() {
               mineIndexes,
               hitIndex,
             }),
-            announcement: 'Mine hit. Round lost.',
+            announcement: "Mine hit. Round lost.",
           });
           return;
         }
@@ -573,8 +579,8 @@ export function useMinesSession() {
           );
           return {
             revealed: true,
-            content: 'safe' as const,
-            revealStyle: 'player' as const,
+            content: "safe" as const,
+            revealStyle: "player" as const,
             selected: false,
             cashoutLabel: formatCellCashoutLabel(betAmount, multiplier),
             disabled: false,
@@ -589,7 +595,7 @@ export function useMinesSession() {
         const payoutAmount = new BigNumber(betAmount)
           .times(multiplier)
           .toFixed();
-        playSound('cashout');
+        playSound("cashout");
         settleFinishedRound({
           betAmount,
           payoutAmount,
@@ -600,16 +606,16 @@ export function useMinesSession() {
             cells: revealedSelected,
             mineIndexes,
           }),
-          announcement: 'Autobet round won.',
+          announcement: "Autobet round won.",
         });
       },
       reduceMotion ? 0 : MINES_STORY_AUTOBET_REVEAL_DELAY_MS,
     );
-  });
+  };
 
   const placeManualBet = () => {
     const current = stateRef.current;
-    if (current.mode !== 'manual') return;
+    if (current.mode !== "manual") return;
     if (current.isRoundPlaying) {
       cashout();
       return;
@@ -621,7 +627,7 @@ export function useMinesSession() {
     const current = stateRef.current;
     if (
       current.isRoundPlaying ||
-      current.mode !== 'auto' ||
+      current.mode !== "auto" ||
       !new BigNumber(current.betAmount).gt(0) ||
       current.selectedIndexes.length === 0 ||
       !wallet.canAfford(current.betAmount) ||
@@ -633,7 +639,7 @@ export function useMinesSession() {
     const next: MinesSessionState = {
       ...current,
       initialBet: current.betAmount,
-      auto: { kind: 'running' },
+      auto: { kind: "running" },
       metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
     };
     stateRef.current = next;
@@ -645,7 +651,7 @@ export function useMinesSession() {
     const current = stateRef.current;
     if (
       current.isRoundPlaying ||
-      (current.auto.kind !== 'paused' && current.auto.kind !== 'failed')
+      (current.auto.kind !== "paused" && current.auto.kind !== "failed")
     ) {
       return;
     }
@@ -656,15 +662,15 @@ export function useMinesSession() {
           metrics: current.metrics,
           stopConditions: getStopConditions(current),
         },
-        '1',
+        "1",
       )
     ) {
-      const idle = { ...current, auto: { kind: 'idle' as const } };
+      const idle = { ...current, auto: { kind: "idle" as const } };
       stateRef.current = idle;
       setState(idle);
       return;
     }
-    const next = { ...current, auto: { kind: 'running' as const } };
+    const next = { ...current, auto: { kind: "running" as const } };
     stateRef.current = next;
     setState(next);
     queueMicrotask(() => runAutoRound());
@@ -672,8 +678,24 @@ export function useMinesSession() {
 
   const stopAutoBet = () => {
     const current = stateRef.current;
-    if (current.auto.kind !== 'running') return;
-    const next = { ...current, auto: { kind: 'stopping' as const } };
+    if (current.auto.kind !== "running") return;
+
+    if (!current.isRoundPlaying && boardClearTimerRef.current === null) {
+      const next = {
+        ...current,
+        auto: {
+          kind:
+            current.metrics.roundsCompleted > 0
+              ? ("paused" as const)
+              : ("idle" as const),
+        },
+      };
+      stateRef.current = next;
+      setState(next);
+      return;
+    }
+
+    const next = { ...current, auto: { kind: "stopping" as const } };
     stateRef.current = next;
     setState(next);
   };
@@ -684,7 +706,7 @@ export function useMinesSession() {
       stopAutoBet();
       return;
     }
-    if (current.auto.kind === 'paused' || current.auto.kind === 'failed') {
+    if (current.auto.kind === "paused" || current.auto.kind === "failed") {
       continueAutobet();
       return;
     }
@@ -700,7 +722,7 @@ export function useMinesSession() {
     const next: MinesSessionState = {
       ...current,
       mode,
-      auto: { kind: 'idle' },
+      auto: { kind: "idle" },
       metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
       cells: createMinesGridCells(current.gridSize),
       mineIndexes: [],
@@ -767,6 +789,7 @@ export function useMinesSession() {
   const continueAfterPresentation = useEffectEvent(runAutoRound);
   useEffect(() => {
     if (!isAutobetActive(state.auto) || state.isRoundPlaying) return undefined;
+    if (state.auto.kind === "stopping") return undefined;
     const timer = window.setTimeout(
       continueAfterPresentation,
       AUTOBET_CONTINUE_DELAY_MS,
@@ -778,11 +801,11 @@ export function useMinesSession() {
     const onVisibilityChange = () => {
       if (document.hidden) stopAutoBet();
     };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('pagehide', stopAutoBet);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", stopAutoBet);
     return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('pagehide', stopAutoBet);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", stopAutoBet);
     };
   }, []);
 
@@ -793,12 +816,12 @@ export function useMinesSession() {
     ) {
       return;
     }
-    const next = '0';
+    const next = "0";
     applyAutobetEdit({ betAmount: next, initialBet: next });
   }, [wallet.currencyId]);
 
   const commitCryptoBetAmount = (cryptoAmount: string) => {
-    const amount = cryptoAmount || '0';
+    const amount = cryptoAmount || "0";
     applyAutobetEdit({ betAmount: amount, initialBet: amount });
     return amount;
   };
@@ -829,7 +852,7 @@ export function useMinesSession() {
   const currentPayoutAmount =
     currentMultiplier > 0
       ? new BigNumber(state.betAmount).times(currentMultiplier).toFixed()
-      : '0';
+      : "0";
 
   return {
     ...state,
