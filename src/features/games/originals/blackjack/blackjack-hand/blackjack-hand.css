@@ -1,0 +1,112 @@
+.blackjack-hand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.blackjack-hand__cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ds-spacing-2);
+}
+
+.blackjack-hand__score {
+  margin-top: var(--ds-spacing-3);
+  display: flex;
+  min-width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ds-radius-2px);
+  padding: var(--ds-spacing-1) 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+/* Legacy gray-6 chip — normal / inactive hand */
+.blackjack-hand__score--idle {
+  background: var(--ds-button-gray-background);
+  color: var(--ds-white);
+}
+
+/* Legacy purple-5 — active hand on split */
+.blackjack-hand__score--active {
+  background: var(--ds-purple-500);
+  color: var(--ds-white);
+}
+
+/* Legacy bg-error — bust / lose */
+.blackjack-hand__score--bust,
+.blackjack-hand__score--lose {
+  background: var(--ds-error-500);
+  color: var(--ds-gray-950);
+}
+
+/* Legacy warning-5 — push / tie */
+.blackjack-hand__score--push {
+  background: var(--ds-warning-500);
+  color: var(--ds-gray-950);
+}
+
+/* Legacy brand-primary — win / blackjack */
+.blackjack-hand__score--win,
+.blackjack-hand__score--blackjack {
+  background: var(--ds-lime-300);
+  color: var(--ds-gray-950);
+}
+
+/* Border sits on the card frame (matches betstrike: fixed light outline; glow color varies by state).
+   Card PNGs have transparent rounded corners - fill with white so the dark table does not show
+   through between the outline and the card face. Do not use overflow:hidden here: it would clip box-shadow. */
+.blackjack-hand__card {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 4px;
+  line-height: 0;
+  background: var(--ds-white);
+}
+
+@media (min-width: 640px) {
+  .blackjack-hand__card {
+    border-radius: 6px;
+  }
+}
+
+.blackjack-hand__card--idle {
+  border-color: transparent;
+}
+
+/* Card glow shadows (from legacy blackjack.css) - outline stays gray-100 / brand-white for all states */
+.blackjack-hand__card--win {
+  border-color: var(--ds-gray-100);
+  box-shadow:
+    0 4px 10px 0 rgba(200, 255, 107, 0.4),
+    0 16px 60px 0 rgba(200, 255, 107, 0.5),
+    0 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.blackjack-hand__card--bust,
+.blackjack-hand__card--lose {
+  border-color: var(--ds-gray-100);
+  box-shadow:
+    0 4px 10px 0 rgba(255, 107, 107, 0.4),
+    0 16px 60px 0 rgba(255, 107, 107, 0.5),
+    0 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.blackjack-hand__card--push {
+  border-color: var(--ds-gray-100);
+  box-shadow:
+    0 4px 10px 0 rgba(255, 213, 107, 0.4),
+    0 16px 60px 0 rgba(255, 213, 107, 0.5),
+    0 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.blackjack-hand__card--active {
+  border-color: var(--ds-gray-100);
+  box-shadow:
+    0 0 60px rgba(100, 40, 219, 0.4),
+    0 5px 10px rgba(100, 40, 219, 0.2);
+}

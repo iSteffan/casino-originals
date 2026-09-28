@@ -64,7 +64,9 @@ function withAppHeader(
 
 export default definePreview({
   addons: [addonDocs(), pseudoStates()],
-  decorators: [withNextIntl, withAppHeader],
+  // Last decorator is outermost (Storybook 10 definePreview). WalletProvider in
+  // withNextIntl must wrap AppHeaderShell (useWallet).
+  decorators: [withAppHeader, withNextIntl],
   initialGlobals: {
     backgrounds: { value: 'dark' },
   },

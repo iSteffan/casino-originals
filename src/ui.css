@@ -17,6 +17,7 @@
 @import './features/games/originals/keno/keno-paytable/keno-paytable.css';
 @import './features/games/originals/towers/towers-cell/towers-cell.css';
 @import './features/games/originals/towers/towers-grid/towers-grid.css';
+@import './features/games/originals/blackjack/blackjack-hand/blackjack-hand.css';
 @import './features/games/originals/shared/autobet-session-status/autobet-session-status.css';
 @import './features/games/originals/shared/bet-amount-input/bet-amount-input.css';
 @import './features/games/originals/shared/game-win-modal/game-win-modal.css';
