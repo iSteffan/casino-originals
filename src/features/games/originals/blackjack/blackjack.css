@@ -1,0 +1,100 @@
+/* Ported from betstrike legacy-originals/styles/games/blackjack.css (125c36de). */
+
+.blackjack-table-bg {
+  background:
+    url('/img/games/blackjack/blackjack-bg-mobile.png'),
+    radial-gradient(92.71% 92.71% at 50% -22.5%, #000 54.36%, #100f13 100%);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: top;
+  min-height: 24rem;
+}
+
+@media (min-width: 400px) {
+  .blackjack-table-bg {
+    background:
+      url('/img/games/blackjack/blackjack-bg.png'),
+      radial-gradient(92.71% 92.71% at 50% -22.5%, #000 54.36%, #100f13 100%);
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+}
+
+.win-shadow {
+  box-shadow:
+    0 4px 10px 0 rgba(200, 255, 107, 0.4),
+    0 16px 60px 0 rgba(200, 255, 107, 0.5),
+    0 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.loss-shadow {
+  box-shadow:
+    0 4px 10px 0 rgba(255, 107, 107, 0.4),
+    0 16px 60px 0 rgba(255, 107, 107, 0.5),
+    0 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.push-shadow {
+  box-shadow:
+    0 4px 10px 0 rgba(255, 213, 107, 0.4),
+    0 16px 60px 0 rgba(255, 213, 107, 0.5),
+    0 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.split-active-shadow {
+  box-shadow:
+    0 0 60px rgba(100, 40, 219, 0.4),
+    0 5px 10px rgba(100, 40, 219, 0.2);
+}
+
+.active-shadow {
+  box-shadow:
+    0 0 60px rgba(100, 40, 219, 0.4),
+    0 5px 10px rgba(100, 40, 219, 0.2);
+}
+
+.blackjack-win-modal {
+  border-radius: 36px;
+  background: linear-gradient(180deg, #242633 0%, #303248 100%);
+  box-shadow:
+    0 2px 8px 0 rgba(100, 40, 219, 0.3),
+    0 8px 40px 0 rgba(100, 40, 219, 0.4);
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.blackjack-score {
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.blackjack-score--idle {
+  background: var(--ds-button-gray-background, #303248);
+  color: #fff;
+}
+
+.blackjack-score--active {
+  background: var(--ds-purple-500, #6428db);
+  color: #fff;
+}
+
+.blackjack-score--lose {
+  background: var(--ds-error-500, #ff6b6b);
+  color: var(--ds-gray-950, #0f0f12);
+}
+
+.blackjack-score--push {
+  background: var(--ds-warning-500, #ffd56b);
+  color: var(--ds-gray-950, #0f0f12);
+}
+
+.blackjack-score--win {
+  background: var(--ds-lime-300, #c8ff6b);
+  color: var(--ds-gray-950, #0f0f12);
+}

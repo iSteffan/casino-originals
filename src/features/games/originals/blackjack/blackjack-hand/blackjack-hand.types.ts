@@ -29,6 +29,13 @@ export interface BlackjackHandProps {
   result?: BlackjackResult;
   label?: string;
   className?: string;
+  /**
+   * Hand index for split initialCardCounts keys and layoutId scope
+   * (betstrike hand 0 / hand 1).
+   */
+  handIndex?: number;
+  /** When false, skip deal fly/flip (part stories). Default true. */
+  animate?: boolean;
 }
 
 export function getBlackjackHandVisualState(

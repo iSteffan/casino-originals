@@ -21,4 +21,6 @@ export interface BlackjackBoardProps {
   theatreMode?: boolean;
   className?: string;
   overlay?: ReactNode;
+  /** When false, skip deal fly/flip (part stories). Default true. */
+  animate?: boolean;
 }

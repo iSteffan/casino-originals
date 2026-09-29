@@ -82,6 +82,10 @@ export function getBlackjackCardSrc(card: BlackjackCard, concealed = false): str
   return `/img/games/blackjack/cards/${concealed ? 'back' : `${card.rank}-of-${card.suit}`}.png`;
 }
 
+export function getBlackjackCardFaceSrc(card: BlackjackCard): string {
+  return `/img/games/blackjack/cards/${card.rank}-of-${card.suit}.png`;
+}
+
 export function getBlackjackCardLabel(card: BlackjackCard, concealed = false): string {
   if (concealed) return blackjackStoryLabels.hiddenCard;
   return `${formatRank(card.rank)} of ${card.suit}`;
@@ -94,8 +98,11 @@ export function toBlackjackCardVisual(
 ): BlackjackCardVisual {
   return {
     id,
-    src: getBlackjackCardSrc(card, concealed),
+    // Always face art — flip/conceal is driven by `concealed` (betstrike card always has rank/suit).
+    src: getBlackjackCardFaceSrc(card),
     label: getBlackjackCardLabel(card, concealed),
+    layoutKey: `${card.rank}-${card.suit}`,
+    concealed,
   };
 }
 
@@ -120,20 +127,25 @@ export function buildBlackjackBoardFromState(
     tableLabel: blackjackStoryLabels.tableLabel,
     backgroundSrc: '/img/games/blackjack/blackjack-bg.png',
     dealer: game.dealer.map((card, index) =>
-      toBlackjackCardVisual(card, `dealer-${index}`, hideHole && index === 1),
+      toBlackjackCardVisual(
+        card,
+        `dealer-${round}-${card.rank}-${card.suit}`,
+        hideHole && index === 1,
+      ),
     ),
     dealerLabel:
       game.dealer.length === 0
         ? blackjackStoryLabels.dealerIdle
         : `Dealer - ${blackjackScore(dealerVisible)}`,
     hands: game.hands.map((hand, index) => ({
-      id: `hand-${index}`,
-      active: game.hands.length > 1 && game.phase === 'playing' && game.activeHand === index,
+      id: `round-${round}-hand-${index}`,
+      active:
+        game.hands.length > 1 && game.phase === 'playing' && game.activeHand === index,
       score: blackjackScore(hand.cards),
       result: hand.result,
       label: `Hand ${index + 1}`,
-      cards: hand.cards.map((card, cardIndex) =>
-        toBlackjackCardVisual(card, `hand-${index}-${cardIndex}`),
+      cards: hand.cards.map((card) =>
+        toBlackjackCardVisual(card, `hand-${index}-${card.rank}-${card.suit}`),
       ),
     })),
     emptyLabel: blackjackStoryLabels.emptyLabel,

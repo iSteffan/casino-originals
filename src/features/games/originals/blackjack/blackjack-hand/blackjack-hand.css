@@ -5,11 +5,30 @@
   align-items: center;
 }
 
+/* Absolute fan stack — mirrors betstrike player motion.ul sizing. */
 .blackjack-hand__cards {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
   justify-content: center;
-  gap: var(--ds-spacing-2);
+  width: 60px;
+  height: 78px;
+}
+
+@media (min-width: 640px) {
+  .blackjack-hand__cards {
+    width: 80px;
+    height: 104px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .blackjack-hand__cards {
+    width: 102px;
+    height: 132px;
+  }
 }
 
 .blackjack-hand__score {
@@ -57,15 +76,21 @@
   color: var(--ds-gray-950);
 }
 
-/* Border sits on the card frame (matches betstrike: fixed light outline; glow color varies by state).
-   Card PNGs have transparent rounded corners - fill with white so the dark table does not show
-   through between the outline and the card face. Do not use overflow:hidden here: it would clip box-shadow. */
+/*
+  Cards are position:absolute (betstrike motion.li).
+  Fan/overlap end-state comes from getBlackjackPlayerAnimatePosition
+  (framer-motion x/y when animate=true; same translate when animate=false).
+*/
 .blackjack-hand__card {
   border-width: 1px;
   border-style: solid;
   border-radius: 4px;
   line-height: 0;
   background: var(--ds-white);
+}
+
+.blackjack-hand__cards > .blackjack-hand__card {
+  position: absolute;
 }
 
 @media (min-width: 640px) {
@@ -78,7 +103,7 @@
   border-color: transparent;
 }
 
-/* Card glow shadows (from legacy blackjack.css) - outline stays gray-100 / brand-white for all states */
+/* Card glow shadows (from legacy blackjack.css) */
 .blackjack-hand__card--win {
   border-color: var(--ds-gray-100);
   box-shadow:
@@ -109,4 +134,8 @@
   box-shadow:
     0 0 60px rgba(100, 40, 219, 0.4),
     0 5px 10px rgba(100, 40, 219, 0.2);
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
 }

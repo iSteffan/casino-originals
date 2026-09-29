@@ -1,0 +1,6 @@
+/* Shoe glow — betstrike .active-shadow on deck back card */
+.blackjack-shoe__card {
+  box-shadow:
+    0 0 60px rgba(100, 40, 219, 0.4),
+    0 5px 10px rgba(100, 40, 219, 0.2);
+}

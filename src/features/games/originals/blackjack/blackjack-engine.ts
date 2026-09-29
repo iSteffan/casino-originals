@@ -31,7 +31,11 @@ export interface BlackjackHand {
   result: BlackjackResult;
 }
 export interface BlackjackState {
-  phase: 'idle' | 'insurance' | 'playing' | 'finished';
+  /**
+   * `dealing` = initial P1→D1→P2→D2 in progress (betstrike startGame cascade).
+   * Actions stay locked until finishBlackjackDemoDeal runs after D2 fly.
+   */
+  phase: 'idle' | 'dealing' | 'insurance' | 'playing' | 'finished';
   deck: BlackjackCard[];
   dealer: BlackjackCard[];
   hands: BlackjackHand[];
@@ -50,7 +54,11 @@ export const EMPTY_BLACKJACK: BlackjackState = {
 };
 
 export function isBlackjackPlaying(state: BlackjackState): boolean {
-  return state.phase === 'playing' || state.phase === 'insurance';
+  return (
+    state.phase === 'playing' ||
+    state.phase === 'insurance' ||
+    state.phase === 'dealing'
+  );
 }
 
 export function canStartBlackjackDemo(state: BlackjackState, stake: number): boolean {
@@ -150,6 +158,79 @@ function checkNaturals(state: BlackjackState): BlackjackState {
     : { ...state, phase: 'playing' };
 }
 
+/**
+ * Empty table + full deck in `dealing` phase.
+ * Port of betstrike startGame reset before the dealCard cascade.
+ */
+export function beginBlackjackDemoDeal(
+  deck: BlackjackCard[],
+  stake: number,
+): BlackjackState {
+  if (!Number.isFinite(stake) || stake <= 0) return EMPTY_BLACKJACK;
+  if (deck.length < 4) return EMPTY_BLACKJACK;
+  return {
+    phase: 'dealing',
+    deck: [...deck],
+    dealer: [],
+    hands: [{ cards: [], stake, result: 'playing' }],
+    activeHand: 0,
+    insurance: 0,
+    profit: 0,
+  };
+}
+
+/**
+ * Append one initial-deal card in P1→D1→P2→D2 order.
+ * Port of betstrike blackjack-context dealCard(toPlayer) during startGame.
+ */
+export function dealNextBlackjackDemoCard(state: BlackjackState): BlackjackState {
+  if (state.phase !== 'dealing') return state;
+  const hand = state.hands[0];
+  if (!hand) return state;
+
+  const playerCount = hand.cards.length;
+  const dealerCount = state.dealer.length;
+  if (playerCount >= 2 && dealerCount >= 2) return state;
+
+  const deck = [...state.deck];
+  const card = deck.shift();
+  if (!card) return state;
+
+  // Same seat rule as betstrike: player when playerCount <= dealerCount, else dealer.
+  if (playerCount <= dealerCount) {
+    return {
+      ...state,
+      deck,
+      hands: [{ ...hand, cards: [...hand.cards, card] }],
+    };
+  }
+
+  return {
+    ...state,
+    deck,
+    dealer: [...state.dealer, card],
+  };
+}
+
+/**
+ * After D2 has locked (fly complete): insurance if up-card Ace, else naturals/playing.
+ * Port of betstrike checkInitialBlackjack (table onAnimationComplete dealer idx===1).
+ */
+export function finishBlackjackDemoDeal(state: BlackjackState): BlackjackState {
+  if (state.phase !== 'dealing') return state;
+  if (state.dealer.length < 2 || (state.hands[0]?.cards.length ?? 0) < 2) return state;
+
+  const dealerFirst = state.dealer[0];
+  if (dealerFirst?.rank === 'Ace') {
+    return { ...state, phase: 'insurance' };
+  }
+  return checkNaturals(state);
+}
+
+/**
+ * Instant full deal (no animation pacing). Prefer begin + dealNext + finish for UI.
+ * Kept for static stories / tests that need a ready hand in one step.
+ */
 export function startBlackjackDemo(deck: BlackjackCard[], stake: number): BlackjackState {
   if (!Number.isFinite(stake) || stake <= 0) return EMPTY_BLACKJACK;
   const [first, dealerFirst, second, dealerSecond, ...remaining] = deck;

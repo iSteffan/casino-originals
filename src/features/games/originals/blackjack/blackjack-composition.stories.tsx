@@ -1,28 +1,21 @@
 'use client';
 
+import { useEffect, useMemo } from 'react';
+
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useArgs } from 'storybook/preview-api';
 
-import { BlackjackBoard } from '#ui/features/games/originals/blackjack/blackjack-board/blackjack-board';
 import { BlackjackConfig } from '#ui/features/games/originals/blackjack/blackjack-config/blackjack-config';
-import {
-  actBlackjack,
-  type BlackjackAction,
-  type BlackjackState,
-  chooseBlackjackInsurance,
-  createBlackjackDemoDeck,
-  startBlackjackDemo,
-} from '#ui/features/games/originals/blackjack/blackjack-engine';
 import {
   blackjackStoryBetAmountTooltip,
   blackjackStoryCurrencyIcon,
   blackjackStoryLabels,
-  buildBlackjackBoardFromState,
-  canStartBlackjackDemo,
-  EMPTY_BLACKJACK,
-  getBlackjackStoryActionItems,
-  isBlackjackPlaying,
 } from '#ui/features/games/originals/blackjack/blackjack-story-helpers';
+import {
+  BlackjackProvider,
+  useBlackjackGame,
+} from '#ui/features/games/originals/blackjack/blackjack-session-context';
+import { BlackjackTable } from '#ui/features/games/originals/blackjack/blackjack-table';
 import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-shell/originals-game-shell';
 import { GameWinModal } from '#ui/features/games/originals/shared/game-win-modal/game-win-modal';
 import { GameHeader } from '#ui/features/games/shared/game-player/game-header/game-header';
@@ -31,63 +24,117 @@ import { cn } from '#ui/lib/cn';
 
 interface PlaygroundArgs {
   amount: string;
-  game: BlackjackState;
-  round: number;
   theatreMode: boolean;
   volume: number;
-  showWinModal: boolean;
-  winAmount: string;
 }
 
-function BlackjackCompositionStory() {
-  const [args, updateArgs] = useArgs<PlaygroundArgs>();
-  const playing = isBlackjackPlaying(args.game);
-  const canStart = canStartBlackjackDemo(args.game, Number(args.amount));
-  const board = buildBlackjackBoardFromState(args.game, args.round);
+type UpdateArgs = (patch: Partial<PlaygroundArgs>) => void;
+
+/**
+ * Playground wired to the ported betstrike session (context + table + card).
+ * Deal cascade, flips, hit/stand/double/split/insurance/dealer reveal match
+ * legacy blackjack-context / blackjack-table from 125c36de (pre-6052c4f52).
+ *
+ * Must stay under BlackjackProvider. Storybook preview hooks (useArgs) stay in
+ * BlackjackCompositionStory — they cannot run in nested components.
+ */
+function BlackjackPlaygroundInner({
+  args,
+  updateArgs,
+}: {
+  args: PlaygroundArgs;
+  updateArgs: UpdateArgs;
+}) {
+  const game = useBlackjackGame();
+
+  const {
+    startGame,
+    setBetAmount,
+    hit,
+    stand,
+    doubleDown,
+    split,
+    insuranceOffered,
+    setInsuranceAccepted,
+    canSplit,
+    isSplitDone,
+    isGameOver,
+    isFirstRoundEnded,
+    isBtnActivated,
+    isGameRunning,
+    betHistory,
+    isWin,
+  } = game;
+
+  const stake = Number.parseFloat(args.amount);
+  const canStart =
+    !isGameRunning && Number.isFinite(stake) && stake > 0 && stake <= 1_000_000;
+
+  useEffect(() => {
+    if (Number.isFinite(stake) && stake > 0) {
+      setBetAmount(stake);
+    }
+  }, [stake, setBetAmount]);
+
+  const lastBet = betHistory[betHistory.length - 1];
+  const showWinModal = Boolean(isGameOver && isWin && lastBet && lastBet.winAmount > 0);
+  const winAmount = lastBet && lastBet.winAmount > 0 ? lastBet.winAmount.toFixed(2) : '0.00';
+
+  const actions = useMemo(() => {
+    if (!isFirstRoundEnded || insuranceOffered || isGameOver || !isGameRunning) {
+      return [];
+    }
+    return [
+      {
+        id: 'hit',
+        label: blackjackStoryLabels.hit,
+        disabled: isBtnActivated,
+        onClick: hit,
+      },
+      {
+        id: 'stand',
+        label: blackjackStoryLabels.stand,
+        disabled: isBtnActivated,
+        onClick: stand,
+      },
+      {
+        id: 'double',
+        label: blackjackStoryLabels.double,
+        disabled: isBtnActivated || isSplitDone,
+        onClick: doubleDown,
+      },
+      {
+        id: 'split',
+        label: blackjackStoryLabels.split,
+        disabled: !canSplit || isBtnActivated,
+        onClick: split,
+      },
+    ];
+  }, [
+    isFirstRoundEnded,
+    insuranceOffered,
+    isGameOver,
+    isGameRunning,
+    isBtnActivated,
+    isSplitDone,
+    canSplit,
+    hit,
+    stand,
+    doubleDown,
+    split,
+  ]);
 
   const updateAmount = (factor: number) => {
-    if (playing) return;
-    const value = Number.parseFloat(args.amount);
-    if (!Number.isNaN(value)) {
-      updateArgs({ amount: (value * factor).toFixed(2) });
+    if (isGameRunning) return;
+    if (!Number.isNaN(stake)) {
+      updateArgs({ amount: (stake * factor).toFixed(2) });
     }
   };
 
   const deal = () => {
-    if (!canStartBlackjackDemo(args.game, Number(args.amount))) return;
-    const nextGame = startBlackjackDemo(
-      createBlackjackDemoDeck(),
-      Number(args.amount),
-    );
-    const finished = nextGame.phase === 'finished';
-    updateArgs({
-      game: nextGame,
-      round: args.round + 1,
-      showWinModal: finished && nextGame.profit > 0,
-      winAmount: finished ? Math.max(0, nextGame.profit).toFixed(2) : '0.00',
-    });
-  };
-
-  const chooseInsurance = (accepted: boolean) => {
-    const nextGame = chooseBlackjackInsurance(args.game, accepted);
-    if (nextGame === args.game) return;
-    const finished = nextGame.phase === 'finished';
-    updateArgs({
-      game: nextGame,
-      showWinModal: finished && nextGame.profit > 0,
-      winAmount: finished ? Math.max(0, nextGame.profit).toFixed(2) : '0.00',
-    });
-  };
-
-  const act = (action: BlackjackAction) => {
-    const nextGame = actBlackjack(args.game, action);
-    if (nextGame === args.game) return;
-    const finished = nextGame.phase === 'finished';
-    updateArgs({
-      game: nextGame,
-      showWinModal: finished && nextGame.profit > 0,
-      winAmount: finished ? Math.max(0, nextGame.profit).toFixed(2) : '0.00',
-    });
+    if (!canStart) return;
+    setBetAmount(stake);
+    startGame();
   };
 
   return (
@@ -123,48 +170,43 @@ function BlackjackCompositionStory() {
             <BlackjackConfig
               amount={args.amount}
               onAmountChange={(amount) => {
-                if (!playing) updateArgs({ amount });
+                if (!isGameRunning) updateArgs({ amount });
               }}
               amountLabel={blackjackStoryLabels.amountLabel}
               amountTooltip={blackjackStoryBetAmountTooltip}
               currencyIcon={blackjackStoryCurrencyIcon}
               amountQuickActions={[
-                { label: '½', onClick: () => updateAmount(0.5) },
+                { label: '1/2', onClick: () => updateAmount(0.5) },
                 { label: '2x', onClick: () => updateAmount(2) },
               ]}
               startLabel={blackjackStoryLabels.startLabel}
               onStart={deal}
               startDisabled={!canStart}
-              playing={playing}
+              playing={isGameRunning}
               insurance={
-                args.game.phase === 'insurance'
+                insuranceOffered
                   ? {
                       label: blackjackStoryLabels.insuranceTerms,
                       acceptLabel: blackjackStoryLabels.insuranceAccept,
                       declineLabel: blackjackStoryLabels.insuranceDecline,
-                      onChoose: chooseInsurance,
+                      onChoose: (accepted) => setInsuranceAccepted(accepted),
                     }
                   : null
               }
-              actions={getBlackjackStoryActionItems(args.game, act)}
+              actions={actions}
             />
           }
           board={
-            <BlackjackBoard
-              {...board}
+            <BlackjackTable
               theatreMode={args.theatreMode}
-              announcement={args.showWinModal ? '' : board.announcement}
+              demoNotice={blackjackStoryLabels.demoNotice}
               overlay={
                 <GameWinModal
-                  open={args.showWinModal}
+                  open={showWinModal}
                   title="You win!"
                   multiplierLabel="Profit"
-                  multiplier={
-                    args.game.profit > 0
-                      ? `+${args.game.profit.toFixed(2)}`
-                      : args.winAmount
-                  }
-                  formattedWinAmount={args.winAmount}
+                  multiplier={showWinModal ? `+${winAmount}` : winAmount}
+                  formattedWinAmount={winAmount}
                   currencyIcon={blackjackStoryCurrencyIcon}
                 />
               }
@@ -177,14 +219,20 @@ function BlackjackCompositionStory() {
   );
 }
 
+function BlackjackCompositionStory() {
+  const [args, updateArgs] = useArgs<PlaygroundArgs>();
+
+  return (
+    <BlackjackProvider>
+      <BlackjackPlaygroundInner args={args} updateArgs={updateArgs} />
+    </BlackjackProvider>
+  );
+}
+
 const defaultArgs = {
   amount: '10.00',
-  game: EMPTY_BLACKJACK,
-  round: 0,
   theatreMode: false,
   volume: 0.75,
-  showWinModal: false,
-  winAmount: '0.00',
 } satisfies PlaygroundArgs;
 
 const meta = {
@@ -194,17 +242,13 @@ const meta = {
     layout: 'fullscreen',
     backgrounds: { default: 'dark' },
     controls: {
-      include: ['amount', 'theatreMode', 'volume', 'showWinModal', 'winAmount'],
+      include: ['amount', 'theatreMode', 'volume'],
     },
   },
   argTypes: {
     amount: { control: { type: 'text' } },
     theatreMode: { control: { type: 'boolean' } },
     volume: { control: { type: 'range', min: 0, max: 1, step: 0.1 } },
-    showWinModal: { control: { type: 'boolean' } },
-    winAmount: { control: { type: 'text' } },
-    game: { control: false },
-    round: { control: false },
   },
   args: defaultArgs,
 } satisfies Meta<PlaygroundArgs>;
@@ -218,13 +262,6 @@ export const Playground: Story = {};
 export const TheatreMode: Story = {
   globals: { viewport: { value: 'desktop', isRotated: false } },
   args: { theatreMode: true },
-};
-
-export const WithWinModal: Story = {
-  args: {
-    showWinModal: true,
-    winAmount: '15.00',
-  },
 };
 
 export const Mobile: Story = {

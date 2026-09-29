@@ -9,11 +9,13 @@ const sampleCards = [
     id: 'c1',
     src: '/img/games/blackjack/cards/8-of-Clubs.png',
     label: '8 of Clubs',
+    layoutKey: '8-Clubs',
   },
   {
     id: 'c2',
     src: '/img/games/blackjack/cards/10-of-Diamonds.png',
     label: '10 of Diamonds',
+    layoutKey: '10-Diamonds',
   },
 ];
 
@@ -32,6 +34,7 @@ const meta = {
     active: false,
     result: 'playing',
     label: 'Hand 1',
+    animate: false,
   },
 } satisfies Meta<typeof BlackjackHand>;
 
@@ -54,11 +57,13 @@ export const ActiveOnSplit: Story = {
         id: 'a1',
         src: '/img/games/blackjack/cards/8-of-Clubs.png',
         label: '8 of Clubs',
+        layoutKey: '8-Clubs',
       },
       {
         id: 'a2',
         src: '/img/games/blackjack/cards/4-of-Hearts.png',
         label: '4 of Hearts',
+        layoutKey: '4-Hearts',
       },
     ],
   },
@@ -77,6 +82,7 @@ export const Bust: Story = {
         id: 'c3',
         src: '/img/games/blackjack/cards/King-of-Hearts.png',
         label: 'King of Hearts',
+        layoutKey: 'King-Hearts',
       },
     ],
   },
@@ -94,11 +100,13 @@ export const Push: Story = {
         id: 'p1',
         src: '/img/games/blackjack/cards/10-of-Spades.png',
         label: '10 of Spades',
+        layoutKey: '10-Spades',
       },
       {
         id: 'p2',
         src: '/img/games/blackjack/cards/Queen-of-Hearts.png',
         label: 'Queen of Hearts',
+        layoutKey: 'Queen-Hearts',
       },
     ],
   },
@@ -123,16 +131,19 @@ export const SplitComparison: Story = {
         active
         result="playing"
         label="Hand 1 active"
+        animate={false}
         cards={[
           {
             id: 's0-1',
             src: '/img/games/blackjack/cards/8-of-Clubs.png',
             label: '8 of Clubs',
+            layoutKey: '8-Clubs',
           },
           {
             id: 's0-2',
             src: '/img/games/blackjack/cards/4-of-Hearts.png',
             label: '4 of Hearts',
+            layoutKey: '4-Hearts',
           },
         ]}
       />
@@ -141,16 +152,19 @@ export const SplitComparison: Story = {
         active={false}
         result="stand"
         label="Hand 2 idle"
+        animate={false}
         cards={[
           {
             id: 's1-1',
             src: '/img/games/blackjack/cards/8-of-Diamonds.png',
             label: '8 of Diamonds',
+            layoutKey: '8-Diamonds',
           },
           {
             id: 's1-2',
             src: '/img/games/blackjack/cards/10-of-Spades.png',
             label: '10 of Spades',
+            layoutKey: '10-Spades',
           },
         ]}
       />
