@@ -1,5 +1,7 @@
 'use client';
 
+import { AnimatePresence, motion } from 'framer-motion';
+
 import type { BlackjackConfigProps } from './blackjack-config.types';
 
 import { BlackjackActions } from '#ui/features/games/originals/blackjack/blackjack-actions/blackjack-actions';
@@ -46,16 +48,26 @@ export function BlackjackConfig({
       <Button type="button" onClick={onStart} disabled={startDisabled}>
         {startLabel}
       </Button>
-      {insurance ? (
-        <BlackjackInsurance
-          label={insurance.label}
-          acceptLabel={insurance.acceptLabel}
-          declineLabel={insurance.declineLabel}
-          onChoose={insurance.onChoose}
-        />
-      ) : (
-        <BlackjackActions actions={actions} />
-      )}
+      <AnimatePresence initial={false}>
+        {insurance ? (
+          <motion.div
+            key="blackjack-insurance"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <BlackjackInsurance
+              label={insurance.label}
+              acceptLabel={insurance.acceptLabel}
+              declineLabel={insurance.declineLabel}
+              onChoose={insurance.onChoose}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      <BlackjackActions actions={actions} />
     </div>
   );
 }

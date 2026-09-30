@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useArgs } from 'storybook/preview-api';
 import { BlackjackConfig } from './blackjack-config';
 import type { BlackjackConfigProps } from './blackjack-config.types';
+import { BlackjackConfigExamples } from '#ui/features/games/originals/blackjack/blackjack-config-examples/blackjack-config-examples';
 
 import { Image } from '#ui/primitives/data-display/image/image';
 
@@ -67,24 +68,36 @@ function BlackjackConfigPlayground(args: PlaygroundArgs) {
         }
       : null,
     actions: [
-      { id: 'hit', label: 'Hit', disabled: !args.playing, onClick: () => undefined },
-      { id: 'stand', label: 'Stand', disabled: !args.playing, onClick: () => undefined },
+      { id: 'hit', label: 'Hit', disabled: !args.playing || args.showInsurance, onClick: () => undefined },
+      { id: 'stand', label: 'Stand', disabled: !args.playing || args.showInsurance, onClick: () => undefined },
       {
         id: 'double',
         label: 'Double',
-        disabled: !args.playing || !args.canDouble,
+        disabled: !args.playing || args.showInsurance || !args.canDouble,
         onClick: () => undefined,
       },
       {
         id: 'split',
         label: 'Split',
-        disabled: !args.playing || !args.canSplit,
+        disabled: !args.playing || args.showInsurance || !args.canSplit,
         onClick: () => undefined,
       },
     ],
   };
 
-  return <BlackjackConfig {...props} />;
+  return (
+    <div className="flex w-full max-w-5xl flex-col gap-4">
+      <div className="w-full max-w-sm">
+        <BlackjackConfig {...props} />
+      </div>
+      {/* Horizontal scenarios under the config panel (mirrors Composition placement). */}
+      <BlackjackConfigExamples
+        layout="horizontal"
+        disabled={args.playing}
+        onScenario={() => undefined}
+      />
+    </div>
+  );
 }
 
 const meta = {

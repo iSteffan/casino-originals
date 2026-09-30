@@ -6,6 +6,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useArgs } from 'storybook/preview-api';
 
 import { BlackjackConfig } from '#ui/features/games/originals/blackjack/blackjack-config/blackjack-config';
+import { BlackjackConfigExamples } from '#ui/features/games/originals/blackjack/blackjack-config-examples/blackjack-config-examples';
 import {
   blackjackStoryBetAmountTooltip,
   blackjackStoryCurrencyIcon,
@@ -49,6 +50,7 @@ function BlackjackPlaygroundInner({
 
   const {
     startGame,
+    customStartGame,
     setBetAmount,
     hit,
     stand,
@@ -80,49 +82,47 @@ function BlackjackPlaygroundInner({
   const showWinModal = Boolean(isGameOver && isWin && lastBet && lastBet.winAmount > 0);
   const winAmount = lastBet && lastBet.winAmount > 0 ? lastBet.winAmount.toFixed(2) : '0.00';
 
-  const actions = useMemo(() => {
-    if (!isFirstRoundEnded || insuranceOffered || isGameOver || !isGameRunning) {
-      return [];
-    }
-    return [
+  const actionsLocked =
+    !isGameRunning || !isFirstRoundEnded || insuranceOffered || isGameOver;
+
+  const actions = useMemo(
+    () => [
       {
         id: 'hit',
         label: blackjackStoryLabels.hit,
-        disabled: isBtnActivated,
+        disabled: actionsLocked || isBtnActivated,
         onClick: hit,
       },
       {
         id: 'stand',
         label: blackjackStoryLabels.stand,
-        disabled: isBtnActivated,
+        disabled: actionsLocked || isBtnActivated,
         onClick: stand,
       },
       {
         id: 'double',
         label: blackjackStoryLabels.double,
-        disabled: isBtnActivated || isSplitDone,
+        disabled: actionsLocked || isBtnActivated || isSplitDone,
         onClick: doubleDown,
       },
       {
         id: 'split',
         label: blackjackStoryLabels.split,
-        disabled: !canSplit || isBtnActivated,
+        disabled: actionsLocked || isBtnActivated || !canSplit,
         onClick: split,
       },
-    ];
-  }, [
-    isFirstRoundEnded,
-    insuranceOffered,
-    isGameOver,
-    isGameRunning,
-    isBtnActivated,
-    isSplitDone,
-    canSplit,
-    hit,
-    stand,
-    doubleDown,
-    split,
-  ]);
+    ],
+    [
+      actionsLocked,
+      isBtnActivated,
+      isSplitDone,
+      canSplit,
+      hit,
+      stand,
+      doubleDown,
+      split,
+    ],
+  );
 
   const updateAmount = (factor: number) => {
     if (isGameRunning) return;
@@ -154,6 +154,7 @@ function BlackjackPlaygroundInner({
           args.theatreMode ? 'h-full max-w-[1750px]' : 'max-w-[1400px]',
         )}
       >
+        <div className={cn(args.theatreMode && 'flex min-h-0 flex-1 flex-col')}>
         <OriginalsGameShell
           header={
             <GameHeader
@@ -214,6 +215,20 @@ function BlackjackPlaygroundInner({
           }
           theatreMode={args.theatreMode}
         />
+        </div>
+        {/* Horizontal test scenarios under board + config; hidden in theatre mode. */}
+        {!args.theatreMode && (
+          <BlackjackConfigExamples
+            layout="horizontal"
+            className="mt-2 shrink-0"
+            disabled={isGameRunning}
+            onScenario={(playerCards, dealerCards) => {
+              if (!canStart) return;
+              setBetAmount(stake);
+              customStartGame(playerCards, dealerCards);
+            }}
+          />
+        )}
       </div>
     </div>
   );

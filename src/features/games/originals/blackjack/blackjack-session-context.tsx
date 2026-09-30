@@ -79,6 +79,8 @@ interface BlackjackGameContextProps {
   isGameOver: boolean;
 
   startGame: () => void;
+  /** Storybook / demo helper: deal fixed player + dealer cards (legacy customStartGame). */
+  customStartGame: (playerCards: Card[], dealerCards: Card[]) => void;
   hit: () => void;
   stand: () => void;
   doubleDown: () => void;
@@ -214,6 +216,87 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
       }, 1000);
     }, 1000);
   };
+
+
+  // -------------------------------------------------------------------test---should be deleted after all checks------------
+  const customStartGame = (playerCards: Card[], dealerCards: Card[]) => {
+    if (isGameRunning) return;
+
+    setIsGameRunning(true);
+
+    setDeck([]);
+    setPlayerHands([]);
+    setPlayerHandsScores([]);
+    setDealerHand([]);
+    setHandResults([]);
+    setPlayerScore(0);
+    setDealerScore(0);
+
+    setFlippedPlayerCards([]);
+    setLocalFlippedFirstHand([]);
+    setLocalFlippedSecondHand([]);
+    setFlippedDealerCards([]);
+    setRevealDealerSecondCard(false);
+    setBetHistory([]);
+    setCanSplit(false);
+    setIsSplitDone(false);
+    setIsGameOver(false);
+
+    setIsWin(false);
+    setIsLose(false);
+    setIsPush(false);
+    setIsFirstRoundEnded(false);
+
+    setActiveHandIndex(0);
+
+    setInsuranceOffered(false);
+    setInsuranceAccepted(null);
+    setIsWinInsurance(false);
+    setIsLoseInsurance(false);
+    setIsBtnActivated(false);
+
+    hasCheckedBlackjackRef.current = false;
+
+    const freshDeck = generateDeck();
+    const deckCopy = [...freshDeck];
+
+    const removeCard = (card: Card) => {
+      const index = deckCopy.findIndex(
+        (c) => c.rank === card.rank && c.suit === card.suit,
+      );
+      if (index !== -1) deckCopy.splice(index, 1);
+    };
+    [...playerCards, ...dealerCards].forEach(removeCard);
+
+    const player: Card[] = [];
+    const dealer: Card[] = [];
+
+    const dealCard = (toPlayer: boolean, card: Card) => {
+      if (toPlayer) {
+        player.push(card);
+        setPlayerHands([[...player]]);
+        setHandResults(['pending']);
+      } else {
+        dealer.push(card);
+        setDealerHand([...dealer]);
+      }
+    };
+
+    setTimeout(() => {
+      dealCard(true, playerCards[0]);
+      setTimeout(() => {
+        dealCard(false, dealerCards[0]);
+        setTimeout(() => {
+          dealCard(true, playerCards[1]);
+          setTimeout(() => {
+            dealCard(false, dealerCards[1]);
+            setDeck(deckCopy);
+          }, 1000);
+        }, 1000);
+      }, 1000);
+    }, 1000);
+  };
+  // ------------------------------------------------------------------------------------------------------------------------
 
   // Add a new card face down for the first hand
   useEffect(() => {
@@ -884,6 +967,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
         updateDealerScore,
 
         startGame,
+        customStartGame,
         hit,
         stand,
         doubleDown,
