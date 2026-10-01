@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { BlackjackPage } from '#ui/features/games/originals/blackjack/blackjack-page';
 import { CoinflipPage } from '#ui/features/games/originals/coinflip/coinflip-page';
 import { DicePage } from '#ui/features/games/originals/dice/dice-page';
 import { KenoPage } from '#ui/features/games/originals/keno/keno-page';
@@ -9,6 +10,7 @@ import { TowersPage } from '#ui/features/games/originals/towers/towers-page';
 import { APP_SIDEBAR_GAMES } from '#ui/layouts/app-sidebar/app-sidebar-games';
 
 const GAME_PAGES = {
+  blackjack: BlackjackPage,
   coinflip: CoinflipPage,
   dice: DicePage,
   keno: KenoPage,
@@ -37,7 +39,7 @@ export async function generateMetadata({
   return {
     title: item ? `${item.label} | Casino Originals` : 'Casino Originals',
     description: item
-      ? `Play ${item.label} вЂ” frontend originals demo`
+      ? `Play ${item.label} — frontend originals demo`
       : 'Frontend-only originals games demo',
   };
 }

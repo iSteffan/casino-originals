@@ -14,10 +14,12 @@ export function BlackjackConfig({
   onAmountChange,
   amountLabel,
   amountTooltip,
+  conversionText,
   currencyIcon,
   amountQuickActions,
   amountError,
   amountLoading,
+  thresholdWarning,
   startLabel,
   onStart,
   startDisabled,
@@ -40,10 +42,12 @@ export function BlackjackConfig({
         disabled={playing}
         precision={2}
         tooltip={amountTooltip}
+        conversionText={conversionText}
         currencyIcon={currencyIcon}
         quickActions={amountQuickActions}
         error={amountError}
         isLoading={amountLoading}
+        thresholdWarning={thresholdWarning}
       />
       <Button type="button" onClick={onStart} disabled={startDisabled}>
         {startLabel}

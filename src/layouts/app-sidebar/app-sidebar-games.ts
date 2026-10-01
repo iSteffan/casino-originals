@@ -31,6 +31,12 @@ export const APP_SIDEBAR_GAMES: readonly SideMenuGameListItem[] = [
     href: '/games/coinflip',
     imageSrc: '/img/games/sidebar/coinflip.png',
   },
+  {
+    id: 'blackjack',
+    label: 'Blackjack',
+    href: '/games/blackjack',
+    imageSrc: '/img/games/sidebar/blackjack.png',
+  },
 ] as const;
 
 /** Maps a Storybook story id to the live app sidebar href. */

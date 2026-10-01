@@ -4,6 +4,7 @@ import type { BlackjackActionItem } from '#ui/features/games/originals/blackjack
 import type {
   BetAmountInputTooltip,
   BetAmountQuickAction,
+  BetAmountThresholdWarningContent,
 } from '#ui/features/games/originals/shared/bet-amount-input/bet-amount-input.types';
 
 export interface BlackjackConfigInsurance {
@@ -18,10 +19,14 @@ export interface BlackjackConfigProps {
   onAmountChange: (value: string) => void;
   amountLabel: string;
   amountTooltip?: BetAmountInputTooltip;
+  /** Secondary amount in the label row (crypto/fiat conversion). */
+  conversionText?: string | null;
   currencyIcon?: ReactNode;
   amountQuickActions?: BetAmountQuickAction[];
   amountError?: string;
   amountLoading?: boolean;
+  /** Caller decides visibility by passing content or `null`. */
+  thresholdWarning?: BetAmountThresholdWarningContent | null;
   startLabel: string;
   onStart: () => void;
   startDisabled: boolean;
