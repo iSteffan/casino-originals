@@ -52,6 +52,7 @@ export function BlackjackConfig({
       <Button type="button" onClick={onStart} disabled={startDisabled}>
         {startLabel}
       </Button>
+      <BlackjackActions actions={actions} />
       <AnimatePresence initial={false}>
         {insurance ? (
           <motion.div
@@ -71,7 +72,6 @@ export function BlackjackConfig({
           </motion.div>
         ) : null}
       </AnimatePresence>
-      <BlackjackActions actions={actions} />
     </div>
   );
 }

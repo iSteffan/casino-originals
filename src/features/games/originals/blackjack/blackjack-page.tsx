@@ -12,6 +12,7 @@ function BlackjackPageInner() {
   return (
     <BlackjackOriginalsView
       config={view.config}
+      configExamples={view.configExamples}
       winOverlay={view.winOverlay}
       header={view.header}
       theatreMode={view.theatreMode}

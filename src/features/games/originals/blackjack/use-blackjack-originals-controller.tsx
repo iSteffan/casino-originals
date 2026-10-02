@@ -1,6 +1,7 @@
 'use client';
 
 import type { BlackjackConfigProps } from '#ui/features/games/originals/blackjack/blackjack-config/blackjack-config.types';
+import type { BlackjackConfigExamplesProps } from '#ui/features/games/originals/blackjack/blackjack-config-examples/blackjack-config-examples.types';
 import { blackjackStoryLabels } from '#ui/features/games/originals/blackjack/blackjack-story-helpers';
 import type { BlackjackSession } from '#ui/features/games/originals/blackjack/use-blackjack-session';
 import type { GameWinModalProps } from '#ui/features/games/originals/shared/game-win-modal/game-win-modal.types';
@@ -84,6 +85,14 @@ export function useBlackjackOriginalsController(
     actions: session.actions,
   };
 
+  const configExamples: Pick<
+    BlackjackConfigExamplesProps,
+    'disabled' | 'onScenario'
+  > = {
+    disabled: game.isGameRunning,
+    onScenario: session.startScenario,
+  };
+
   const winOverlay: GameWinModalProps = {
     open: session.winOverlay.open,
     title: 'You win!',
@@ -107,6 +116,7 @@ export function useBlackjackOriginalsController(
 
   return {
     config,
+    configExamples,
     winOverlay,
     header,
     theatreMode: theatreLayoutActive,

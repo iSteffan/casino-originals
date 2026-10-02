@@ -5,10 +5,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import BigNumber from 'bignumber.js';
 
 import { blackjackStoryLabels } from '#ui/features/games/originals/blackjack/blackjack-story-helpers';
-import { useBlackjackGame } from '#ui/features/games/originals/blackjack/blackjack-session-context';
+import {
+  playBlackjackSound,
+  preloadBlackjackSounds,
+  setBlackjackSoundsVolume,
+  stopBlackjackSounds,
+  type BlackjackSoundName,
+} from '#ui/features/games/originals/blackjack/blackjack-sounds';
+import {
+  useBlackjackGame,
+  type Card,
+} from '#ui/features/games/originals/blackjack/blackjack-session-context';
 import {
   formatWalletAmount,
   formatWalletAmountLabel,
+  getDefaultCryptoBetAmount,
   getFiatStakeUsd,
   SINGLE_BET_THRESHOLD_USD,
   WALLET_CRYPTO_FRACTION_DIGITS,
@@ -25,6 +36,57 @@ export function useBlackjackSession() {
 
   const [theatreMode, setTheatreMode] = useState(false);
   const [volume, setVolume] = useState(0.75);
+  const volumeRef = useRef(volume);
+  const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
+  const prevInsuranceOfferedRef = useRef(false);
+  const prevSplitDoneRef = useRef(false);
+  const prevNaturalBlackjackRef = useRef(false);
+
+  volumeRef.current = volume;
+
+  const playSound = (name: BlackjackSoundName) => {
+    const audio = playBlackjackSound(name, volumeRef.current, (settled) => {
+      activeSoundsRef.current.delete(settled);
+    });
+    if (audio) activeSoundsRef.current.add(audio);
+  };
+
+  useEffect(() => {
+    preloadBlackjackSounds();
+    const activeSounds = activeSoundsRef.current;
+    return () => {
+      stopBlackjackSounds(activeSounds);
+    };
+  }, []);
+
+  useEffect(() => {
+    setBlackjackSoundsVolume(activeSoundsRef.current, volume);
+  }, [volume]);
+
+  // Insurance offer appear SFX (rising edge).
+  useEffect(() => {
+    if (game.insuranceOffered && !prevInsuranceOfferedRef.current) {
+      playSound('insurance');
+    }
+    prevInsuranceOfferedRef.current = game.insuranceOffered;
+  }, [game.insuranceOffered]);
+
+  // Split SFX (rising edge).
+  useEffect(() => {
+    if (game.isSplitDone && !prevSplitDoneRef.current) {
+      playSound('split');
+    }
+    prevSplitDoneRef.current = game.isSplitDone;
+  }, [game.isSplitDone]);
+
+  // Natural blackjack win SFX (rising edge on handResults).
+  useEffect(() => {
+    const isNatural = game.handResults.includes('blackjack');
+    if (isNatural && !prevNaturalBlackjackRef.current) {
+      playSound('blackjack');
+    }
+    prevNaturalBlackjackRef.current = isNatural;
+  }, [game.handResults]);
   /** Always stored in selected-currency crypto units. */
   const [betAmount, setBetAmountCrypto] = useState('0');
   const [winOverlay, setWinOverlay] = useState({
@@ -145,14 +207,46 @@ export function useBlackjackSession() {
     Number.isFinite(stakeNumber) &&
     stakeNumber > 0;
 
-  const placeBet = () => {
+  const beginDeal = (deal: () => void) => {
     if (!canStart) return;
     const asNumber = Number.parseFloat(betAmountRef.current);
     if (!Number.isFinite(asNumber) || asNumber <= 0) return;
     if (!wallet.canAfford(betAmountRef.current)) return;
     game.setBetAmount(asNumber);
     settledHistoryLengthRef.current = game.betHistory.length;
-    game.startGame();
+    deal();
+  };
+
+  const placeBet = () => {
+    beginDeal(() => game.startGame());
+  };
+
+  /**
+   * Demo / QA helper: forced player + dealer cards via BlackjackProvider.customStartGame.
+   * Mirrors Storybook Composition (default stake, no silent canStart no-op): only blocks
+   * while a hand is running; seeds an affordable default when bet is 0 / unaffordable.
+   */
+  const startScenario = (playerCards: Card[], dealerCards: Card[]) => {
+    if (game.isGameRunning) return;
+
+    let crypto = betAmountRef.current;
+    const stakeBn = new BigNumber(crypto);
+    if (!stakeBn.isFinite() || !stakeBn.gt(0) || !wallet.canAfford(crypto)) {
+      const digits = WALLET_CRYPTO_FRACTION_DIGITS[wallet.currencyId];
+      const available = new BigNumber(wallet.balances[wallet.currencyId]);
+      const fallback = new BigNumber(getDefaultCryptoBetAmount(wallet.currencyId));
+      const next = BigNumber.min(fallback, available);
+      if (!next.isFinite() || !next.gt(0)) return;
+      crypto = commitCryptoBetAmount(next.toFixed(digits));
+    }
+
+    const asNumber = Number.parseFloat(crypto);
+    if (!Number.isFinite(asNumber) || asNumber <= 0) return;
+    if (!wallet.canAfford(crypto)) return;
+
+    game.setBetAmount(asNumber);
+    settledHistoryLengthRef.current = game.betHistory.length;
+    game.customStartGame(playerCards, dealerCards);
   };
 
   const actionsLocked =
@@ -214,6 +308,7 @@ export function useBlackjackSession() {
     actions,
     fieldsDisabled: game.isGameRunning,
     placeBet,
+    startScenario,
     setTheatreMode,
     setVolume,
     commitCryptoBetAmount,

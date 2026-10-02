@@ -2,6 +2,8 @@
 
 import { BlackjackConfig } from '#ui/features/games/originals/blackjack/blackjack-config/blackjack-config';
 import type { BlackjackConfigProps } from '#ui/features/games/originals/blackjack/blackjack-config/blackjack-config.types';
+import { BlackjackConfigExamples } from '#ui/features/games/originals/blackjack/blackjack-config-examples/blackjack-config-examples';
+import type { BlackjackConfigExamplesProps } from '#ui/features/games/originals/blackjack/blackjack-config-examples/blackjack-config-examples.types';
 import { BlackjackTable } from '#ui/features/games/originals/blackjack/blackjack-table';
 import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-shell/originals-game-shell';
 import {
@@ -14,6 +16,8 @@ import { cn } from '#ui/lib/cn';
 
 export interface BlackjackOriginalsViewProps {
   config: BlackjackConfigProps;
+  /** Horizontal test scenarios under the shell; hidden in theatre mode. */
+  configExamples: Pick<BlackjackConfigExamplesProps, 'disabled' | 'onScenario'>;
   winOverlay: GameWinModalProps;
   header: {
     title: string;
@@ -34,6 +38,7 @@ export interface BlackjackOriginalsViewProps {
 
 export function BlackjackOriginalsView({
   config,
+  configExamples,
   winOverlay,
   header,
   theatreMode,
@@ -105,6 +110,7 @@ export function BlackjackOriginalsView({
             board={
               <BlackjackTable
                 theatreMode={theatreMode}
+                volume={header.volume}
                 overlay={
                   <GameWinModal
                     open={winOverlay.open}
@@ -119,6 +125,15 @@ export function BlackjackOriginalsView({
               />
             }
           />
+          {/* Horizontal test scenarios under board + config; hidden in theatre mode. */}
+          {!theatreLayoutActive && (
+            <BlackjackConfigExamples
+              layout="horizontal"
+              className="mt-2 shrink-0"
+              disabled={configExamples.disabled}
+              onScenario={configExamples.onScenario}
+            />
+          )}
         </div>
       </div>
     </div>

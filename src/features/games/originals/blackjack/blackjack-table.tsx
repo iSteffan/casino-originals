@@ -11,6 +11,7 @@ import { LayoutGroup, motion } from 'framer-motion';
 
 import { BlackjackCard } from '#ui/features/games/originals/blackjack/blackjack-card/blackjack-card';
 import { useBlackjackGame } from '#ui/features/games/originals/blackjack/blackjack-session-context';
+import { playBlackjackSound } from '#ui/features/games/originals/blackjack/blackjack-sounds';
 import { cn } from '#ui/lib/cn';
 
 import '#ui/features/games/originals/blackjack/blackjack.css';
@@ -24,11 +25,14 @@ export function BlackjackTable({
   overlay,
   className,
   demoNotice,
+  volume = 0,
 }: {
   theatreMode?: boolean;
   overlay?: ReactNode;
   className?: string;
   demoNotice?: string;
+  /** Master volume 0..1 from session / Storybook. 0 mutes deal/flip SFX. */
+  volume?: number;
 }) {
   const {
     playerHands,
@@ -66,6 +70,38 @@ export function BlackjackTable({
   const [initialCardCounts, setInitialCardCounts] = useState<Record<string, boolean>>(
     {},
   );
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  const prevRevealHoleRef = useRef(false);
+  const dealtSoundKeysRef = useRef(new Set<string>());
+
+  const playTableSound = (name: 'deal' | 'flip') => {
+    playBlackjackSound(name, volumeRef.current);
+  };
+
+  const playDealOnce = (key: string) => {
+    if (dealtSoundKeysRef.current.has(key)) return;
+    dealtSoundKeysRef.current.add(key);
+    playTableSound('deal');
+  };
+
+  // Hole-card face-up when dealer reveal starts (no fly onAnimationComplete).
+  useEffect(() => {
+    if (revealDealerSecondCard && !prevRevealHoleRef.current) {
+      playTableSound('flip');
+    }
+    prevRevealHoleRef.current = revealDealerSecondCard;
+  }, [revealDealerSecondCard]);
+
+  useEffect(() => {
+    const hasCards =
+      dealerHand.length > 0 || playerHands.some((hand) => hand.length > 0);
+    if (!hasCards) {
+      dealtSoundKeysRef.current.clear();
+      prevRevealHoleRef.current = false;
+    }
+  }, [dealerHand.length, playerHands]);
+
 
   useEffect(() => {
     if (entryRef.current) {
@@ -238,10 +274,18 @@ export function BlackjackTable({
                 initial={getInitialPosition(dealerHandRef)}
                 animate={getDealerAnimatePosition(idx)}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
+                onAnimationStart={() => {
+                  playDealOnce(`dealer-${idx}-${card.rank}-${card.suit}`);
+                }}
                 onAnimationComplete={() => {
                   setFlippedDealerCards((prev) => {
                     const updated = [...prev];
+                    const alreadyFlipped = Boolean(updated[idx]);
                     updated[idx] = true;
+                    // Face-up flip SFX for up-card / later reveals (hole waits for reveal).
+                    if (!alreadyFlipped && (idx !== 1 || revealDealerSecondCard)) {
+                      playTableSound('flip');
+                    }
                     const visibleCards = revealDealerSecondCard
                       ? dealerHand.filter((_, i) => updated[i])
                       : dealerHand.slice(0, 1);
@@ -296,10 +340,17 @@ export function BlackjackTable({
                     animate={getPlayerAnimatePosition(idx, playerHands[0]?.length ?? 0)}
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     layout
+                    onAnimationStart={() => {
+                      if (shouldAnimateFromDeck) {
+                        playDealOnce(`hand-0-${idx}-${card.rank}-${card.suit}`);
+                      }
+                    }}
                     onAnimationComplete={() => {
                       setLocalFlippedFirstHand((prev) => {
                         const updated = [...prev];
+                        const alreadyFlipped = Boolean(updated[idx]);
                         updated[idx] = true;
+                        if (!alreadyFlipped) playTableSound('flip');
                         return updated;
                       });
                       setFlippedPlayerCards((prev) => {
@@ -360,10 +411,18 @@ export function BlackjackTable({
                     animate={getPlayerAnimatePosition(idx, playerHands[1].length)}
                     transition={{ duration: 0.6, ease: 'easeOut' }}
                     layout
+                    onAnimationStart={() => {
+                      if (shouldAnimateFromDeck) {
+                        playDealOnce(`hand-1-${idx}-${card.rank}-${card.suit}`);
+                      }
+                    }}
                     onAnimationComplete={() => {
                       setLocalFlippedSecondHand((prev) => {
                         const updated = [...prev];
-                        if (!updated[idx]) updated[idx] = true;
+                        if (!updated[idx]) {
+                          updated[idx] = true;
+                          playTableSound('flip');
+                        }
                         return updated;
                       });
                     }}

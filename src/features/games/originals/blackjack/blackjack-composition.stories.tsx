@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useArgs } from 'storybook/preview-api';
@@ -16,6 +16,13 @@ import {
   BlackjackProvider,
   useBlackjackGame,
 } from '#ui/features/games/originals/blackjack/blackjack-session-context';
+import {
+  playBlackjackSound,
+  preloadBlackjackSounds,
+  setBlackjackSoundsVolume,
+  stopBlackjackSounds,
+  type BlackjackSoundName,
+} from '#ui/features/games/originals/blackjack/blackjack-sounds';
 import { BlackjackTable } from '#ui/features/games/originals/blackjack/blackjack-table';
 import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-shell/originals-game-shell';
 import { GameWinModal } from '#ui/features/games/originals/shared/game-win-modal/game-win-modal';
@@ -66,7 +73,56 @@ function BlackjackPlaygroundInner({
     isGameRunning,
     betHistory,
     isWin,
+    handResults,
   } = game;
+
+  const volumeRef = useRef(args.volume);
+  const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
+  const prevInsuranceOfferedRef = useRef(false);
+  const prevSplitDoneRef = useRef(false);
+  const prevNaturalBlackjackRef = useRef(false);
+  volumeRef.current = args.volume;
+
+  const playSound = (name: BlackjackSoundName) => {
+    const audio = playBlackjackSound(name, volumeRef.current, (settled) => {
+      activeSoundsRef.current.delete(settled);
+    });
+    if (audio) activeSoundsRef.current.add(audio);
+  };
+
+  useEffect(() => {
+    preloadBlackjackSounds();
+    const activeSounds = activeSoundsRef.current;
+    return () => {
+      stopBlackjackSounds(activeSounds);
+    };
+  }, []);
+
+  useEffect(() => {
+    setBlackjackSoundsVolume(activeSoundsRef.current, args.volume);
+  }, [args.volume]);
+
+  useEffect(() => {
+    if (insuranceOffered && !prevInsuranceOfferedRef.current) {
+      playSound('insurance');
+    }
+    prevInsuranceOfferedRef.current = insuranceOffered;
+  }, [insuranceOffered]);
+
+  useEffect(() => {
+    if (isSplitDone && !prevSplitDoneRef.current) {
+      playSound('split');
+    }
+    prevSplitDoneRef.current = isSplitDone;
+  }, [isSplitDone]);
+
+  useEffect(() => {
+    const isNatural = handResults.includes('blackjack');
+    if (isNatural && !prevNaturalBlackjackRef.current) {
+      playSound('blackjack');
+    }
+    prevNaturalBlackjackRef.current = isNatural;
+  }, [handResults]);
 
   const stake = Number.parseFloat(args.amount);
   const canStart =
@@ -201,6 +257,7 @@ function BlackjackPlaygroundInner({
             <BlackjackTable
               theatreMode={args.theatreMode}
               demoNotice={blackjackStoryLabels.demoNotice}
+              volume={args.volume}
               overlay={
                 <GameWinModal
                   open={showWinModal}
@@ -209,6 +266,7 @@ function BlackjackPlaygroundInner({
                   multiplier={showWinModal ? `+${winAmount}` : winAmount}
                   formattedWinAmount={winAmount}
                   currencyIcon={blackjackStoryCurrencyIcon}
+                volume={args.volume}
                 />
               }
             />
