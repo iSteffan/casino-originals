@@ -1,0 +1,17 @@
+@utility ds-roulette-cell-blink {
+  animation: ds-roulette-cell-blink 1s ease-in-out 3;
+}
+
+@keyframes ds-roulette-cell-blink {
+  0%,
+  100% {
+    box-shadow: 0 0 10px 3px #a26bff;
+  }
+  50% {
+    box-shadow: 0 0 20px 6px #a26bff;
+  }
+}
+
+@utility ds-roulette-cell-chip-label {
+  text-shadow: 0 1.25px 0 rgba(0, 0, 0, 0.25);
+}
