@@ -72,7 +72,6 @@ function BlackjackPlaygroundInner({
     isBtnActivated,
     isGameRunning,
     betHistory,
-    isWin,
     handResults,
   } = game;
 
@@ -135,8 +134,14 @@ function BlackjackPlaygroundInner({
   }, [stake, setBetAmount]);
 
   const lastBet = betHistory[betHistory.length - 1];
-  const showWinModal = Boolean(isGameOver && isWin && lastBet && lastBet.winAmount > 0);
-  const winAmount = lastBet && lastBet.winAmount > 0 ? lastBet.winAmount.toFixed(2) : '0.00';
+  // Same rule as live session: any winning hand (incl. split with net <= 0) opens the modal.
+  const lastBetWon = Boolean(lastBet && (lastBet.isPlayerWin || lastBet.winAmount > 0));
+  const showWinModal = Boolean(isGameOver && lastBetWon);
+  const winAmount = lastBet && lastBetWon
+    ? (lastBet.isPlayerWin ? lastBet.handsWinAmount : lastBet.winAmount).toFixed(2)
+    : '0.00';
+  const netProfit = lastBet?.winAmount ?? 0;
+  const profitLabel = `${netProfit < 0 ? '-' : '+'}${Math.abs(netProfit).toFixed(2)}`;
 
   const actionsLocked =
     !isGameRunning || !isFirstRoundEnded || insuranceOffered || isGameOver;
@@ -263,7 +268,7 @@ function BlackjackPlaygroundInner({
                   open={showWinModal}
                   title="You win!"
                   multiplierLabel="Profit"
-                  multiplier={showWinModal ? `+${winAmount}` : winAmount}
+                  multiplier={showWinModal ? profitLabel : winAmount}
                   formattedWinAmount={winAmount}
                   currencyIcon={blackjackStoryCurrencyIcon}
                 volume={args.volume}

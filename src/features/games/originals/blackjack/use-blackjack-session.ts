@@ -95,7 +95,8 @@ export function useBlackjackSession() {
     formattedWinAmount: '0.00',
   });
 
-  const settledHistoryLengthRef = useRef(0);
+  /** roundId of the last betHistory entry already applied to the demo wallet / win modal. */
+  const settledRoundIdRef = useRef<number | null>(null);
   const betAmountRef = useRef(betAmount);
   betAmountRef.current = betAmount;
 
@@ -128,20 +129,15 @@ export function useBlackjackSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- currency switch only
   }, [wallet.currencyId]);
 
-  // Settle demo wallet once per finished hand from betHistory.
+  // Settle demo wallet once per finished round (keyed by roundId, not betHistory length:
+  // startGame clears betHistory, so a length baseline from the previous round skipped
+  // every single-entry round after the first one).
   useEffect(() => {
-    if (!game.isGameOver) {
-      if (!game.isGameRunning) {
-        settledHistoryLengthRef.current = game.betHistory.length;
-      }
-      return;
-    }
-
-    if (game.betHistory.length <= settledHistoryLengthRef.current) return;
+    if (!game.isGameOver) return;
 
     const lastBet = game.betHistory[game.betHistory.length - 1];
-    settledHistoryLengthRef.current = game.betHistory.length;
-    if (!lastBet) return;
+    if (!lastBet || lastBet.roundId === settledRoundIdRef.current) return;
+    settledRoundIdRef.current = lastBet.roundId;
 
     const unitBet = new BigNumber(lastBet.betAmount);
     if (!unitBet.isFinite() || unitBet.lte(0)) return;
@@ -157,16 +153,22 @@ export function useBlackjackSession() {
       payoutAmount: payoutAmount.isFinite() ? payoutAmount.toFixed() : '0',
     });
 
-    const isWin = lastBet.winAmount > 0;
+    // betstrike rule: a round is a win when any hand wins (win | blackjack), even if
+    // the split net is <= 0 (e.g. hand 1 busts, hand 2 beats the dealer). Insurance-only
+    // net wins (insurance paid + push) still open the modal as before.
+    const isWin = lastBet.isPlayerWin || lastBet.winAmount > 0;
     if (isWin) {
-      const profitCrypto = profit.toFixed();
-      const formatted = formatWalletAmountLabel(
-        formatWalletAmount(profitCrypto, wallet.currencyId, wallet.displayFiat),
-      );
+      const formatAmount = (value: BigNumber) =>
+        formatWalletAmountLabel(
+          formatWalletAmount(value.abs().toFixed(), wallet.currencyId, wallet.displayFiat),
+        );
+      const wonAmount = lastBet.isPlayerWin
+        ? new BigNumber(lastBet.handsWinAmount)
+        : profit;
       setWinOverlay({
         open: true,
-        profitLabel: `+${formatted}`,
-        formattedWinAmount: formatted,
+        profitLabel: `${profit.isNegative() ? '-' : '+'}${formatAmount(profit)}`,
+        formattedWinAmount: formatAmount(wonAmount),
       });
     } else {
       setWinOverlay({
@@ -213,7 +215,6 @@ export function useBlackjackSession() {
     if (!Number.isFinite(asNumber) || asNumber <= 0) return;
     if (!wallet.canAfford(betAmountRef.current)) return;
     game.setBetAmount(asNumber);
-    settledHistoryLengthRef.current = game.betHistory.length;
     deal();
   };
 
@@ -245,7 +246,6 @@ export function useBlackjackSession() {
     if (!wallet.canAfford(crypto)) return;
 
     game.setBetAmount(asNumber);
-    settledHistoryLengthRef.current = game.betHistory.length;
     game.customStartGame(playerCards, dealerCards);
   };
 

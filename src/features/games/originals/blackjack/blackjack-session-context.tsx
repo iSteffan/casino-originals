@@ -45,13 +45,20 @@ export interface Card {
 }
 
 interface BetHistoryItem {
+  /** Round this entry belongs to (one entry per round; settle once per roundId). */
+  roundId: number;
   betAmount: number;
   isSplit: boolean;
   handResults: HandResult[];
   insuranceTaken: boolean;
   insuranceResult?: 'win' | 'lose';
   blackjack: boolean;
+  /** Net round profit (all hands + insurance); can be <= 0 on a split with a winning hand. */
   winAmount: number;
+  /** Profit won by winning hands only (win = 1x, blackjack = 1.5x per hand). */
+  handsWinAmount: number;
+  /** At least one player hand won (betstrike win-modal rule: some win | blackjack). */
+  isPlayerWin: boolean;
 }
 
 interface BlackjackGameContextProps {
@@ -145,6 +152,22 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
   const [isBtnActivated, setIsBtnActivated] = useState(false);
   const [isGameRunning, setIsGameRunning] = useState(false);
 
+  /**
+   * One dealer play-out per round. On split, stand() on the last hand and the split
+   * bust/hand-switch effect both reach revealDealerAndFinishGame before isGameOver
+   * flips, which ran the dealer twice and appended a duplicate betHistory entry.
+   */
+  const dealerPlayStartedRef = useRef(false);
+
+  /**
+   * Round bookkeeping for betHistory: bumped on every deal; the betHistory effect
+   * records exactly one entry per round (the final handResults when isGameOver flips).
+   * Without it, any later dep change after game over (stake edit, late handResults
+   * update) appended extra entries, and the live session settled by array length.
+   */
+  const roundIdRef = useRef(0);
+  const recordedRoundIdRef = useRef<number | null>(null);
+
   const startGame = () => {
     if (isGameRunning) return;
 
@@ -182,6 +205,8 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     setIsBtnActivated(false);
 
     hasCheckedBlackjackRef.current = false;
+    dealerPlayStartedRef.current = false;
+    roundIdRef.current += 1;
 
     const freshDeck = generateDeck();
     const deckCopy = [...freshDeck];
@@ -256,6 +281,8 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     setIsBtnActivated(false);
 
     hasCheckedBlackjackRef.current = false;
+    dealerPlayStartedRef.current = false;
+    roundIdRef.current += 1;
 
     const freshDeck = generateDeck();
     const deckCopy = [...freshDeck];
@@ -366,14 +393,15 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (resultsCopy.every((r) => r !== 'pending')) {
-      revealDealerAndFinishGame();
+      revealDealerAndFinishGame(resultsCopy);
     } else {
       setIsBtnActivated(false);
     }
   };
 
   const revealDealerAndFinishGame = (results: HandResult[] = handResults) => {
-    if (isGameOver) return;
+    if (isGameOver || dealerPlayStartedRef.current) return;
+    dealerPlayStartedRef.current = true;
     setRevealDealerSecondCard(true);
 
     if (results.every((r) => r === 'busted')) {
@@ -909,9 +937,18 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     return total;
   };
 
+  const calculateHandsWinAmount = (bet: number, results: HandResult[]): number =>
+    results.reduce((total, res) => {
+      if (res === 'win') return total + bet;
+      if (res === 'blackjack') return total + bet * 1.5;
+      return total;
+    }, 0);
+
   // update betHistory
   useEffect(() => {
     if (!isGameOver) return;
+    if (recordedRoundIdRef.current === roundIdRef.current) return;
+    recordedRoundIdRef.current = roundIdRef.current;
 
     const winAmount = calculateWinAmount(
       betAmount,
@@ -921,6 +958,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const newBetItem: BetHistoryItem = {
+      roundId: roundIdRef.current,
       betAmount,
       isSplit: isSplitDone,
       handResults: [...handResults],
@@ -928,6 +966,8 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
       insuranceResult: isWinInsurance ? 'win' : isLoseInsurance ? 'lose' : undefined,
       blackjack: handResults.includes('blackjack'),
       winAmount,
+      handsWinAmount: calculateHandsWinAmount(betAmount, handResults),
+      isPlayerWin: handResults.some((r) => r === 'win' || r === 'blackjack'),
     };
 
     setBetHistory((prev) => [...prev, newBetItem]);
