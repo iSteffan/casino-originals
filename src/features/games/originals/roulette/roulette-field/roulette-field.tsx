@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { RouletteCell } from '../roulette-cell/roulette-cell';
 import {
+  ROULETTE_DESKTOP_FIELD_HEIGHT,
+  ROULETTE_DESKTOP_FIELD_WIDTH,
   ROULETTE_RANGE_MAP,
   ROULETTE_ROW_1,
   ROULETTE_ROW_2,
@@ -12,6 +14,7 @@ import {
 } from '../roulette.constants';
 import type { RouletteFieldProps } from './roulette-field.types';
 import { getRouletteFieldStraightId } from './roulette-field.utils';
+import { useRouletteFieldFitScale } from './use-roulette-field-fit-scale';
 
 import { cn } from '#ui/lib/cn';
 
@@ -21,11 +24,17 @@ export function RouletteField({
   highlightedNumbers = [],
   winningNumber = null,
   disabled = false,
+  compact = false,
   onCellClick,
   onHoverNumbersChange,
   className,
   'aria-label': ariaLabel = 'Roulette betting field',
 }: RouletteFieldProps) {
+  const desktopContainerRef = useRef<HTMLDivElement>(null);
+  const fitScale = useRouletteFieldFitScale(desktopContainerRef, true);
+  // Betstrike also dropped scale further when chat/sidebar was open; keep a little
+  // breathing room once the grid already fits, without causing overflow.
+  const desktopScale = compact ? Math.min(fitScale, 0.95) : fitScale;
   const highlighted = new Set(highlightedNumbers);
 
   const chipsFor = useCallback(
@@ -108,14 +117,63 @@ export function RouletteField({
     />
   );
 
+  const desktopGrid = (
+    <div className="text-[20px] leading-[1.4] text-ds-white">
+      <div className="grid grid-cols-[repeat(14,54px)] grid-rows-[repeat(3,54px)] gap-[4px]">
+        <div className="row-span-3">{renderStraight(0)}</div>
+        {ROULETTE_ROW_1.map(renderStraight)}
+        {renderTwoToOne('Row1')}
+        {ROULETTE_ROW_2.map(renderStraight)}
+        {renderTwoToOne('Row2')}
+        {ROULETTE_ROW_3.map(renderStraight)}
+        {renderTwoToOne('Row3')}
+      </div>
+
+      <div className="mt-[4px] grid grid-cols-[54px_1fr_54px] gap-[4px]">
+        <div className="bg-transparent" />
+        <div className="grid grid-cols-3 gap-[4px]">
+          {(['1-12', '13-24', '25-36'] as const).map((key) => (
+            <div key={key} className="h-[54px] w-full">
+              {renderOutside(key, key, 'lg')}
+            </div>
+          ))}
+        </div>
+        <div className="bg-transparent" />
+      </div>
+
+      <div className="mt-[4px] grid grid-cols-[54px_1fr_54px] gap-[4px]">
+        <div className="bg-transparent" />
+        <div className="grid grid-cols-6 gap-[4px]">
+          {(
+            [
+              ['1-18', '1-18'],
+              ['Even', 'Even'],
+              ['Red', 'Red'],
+              ['Black', 'Black'],
+              ['Odd', 'Odd'],
+              ['19-36', '19-36'],
+            ] as const
+          ).map(([id, label]) => (
+            <div key={id} className="h-[54px] w-full">
+              {renderOutside(id, label, 'md', {
+                color: id === 'Red' ? 'red' : 'black',
+              })}
+            </div>
+          ))}
+        </div>
+        <div className="bg-transparent" />
+      </div>
+    </div>
+  );
+
   return (
     <div
       role="group"
       aria-label={ariaLabel}
-      className={cn('w-fit text-ds-white md:mx-auto md:scale-90 xl:scale-100', className)}
+      className={cn('w-full min-w-0 text-ds-white', className)}
     >
-      {/* Mobile */}
-      <div className="flex flex-row-reverse md:hidden">
+      {/* Mobile — unchanged stacked layout */}
+      <div className="flex w-fit flex-row-reverse md:hidden">
         <div className="grid w-fit grid-cols-[repeat(3,60px)] gap-[4px]">
           <div className="col-span-3">{renderStraight(0)}</div>
           {(
@@ -165,51 +223,24 @@ export function RouletteField({
         </div>
       </div>
 
-      {/* Desktop */}
-      <div className="hidden text-[20px] leading-[1.4] md:block">
-        <div className="grid grid-cols-[repeat(14,54px)] grid-rows-[repeat(3,54px)] gap-[4px]">
-          <div className="row-span-3">{renderStraight(0)}</div>
-          {ROULETTE_ROW_1.map(renderStraight)}
-          {renderTwoToOne('Row1')}
-          {ROULETTE_ROW_2.map(renderStraight)}
-          {renderTwoToOne('Row2')}
-          {ROULETTE_ROW_3.map(renderStraight)}
-          {renderTwoToOne('Row3')}
-        </div>
-
-        <div className="mt-[4px] grid grid-cols-[54px_1fr_54px] gap-[4px]">
-          <div className="bg-transparent" />
-          <div className="grid grid-cols-3 gap-[4px]">
-            {(['1-12', '13-24', '25-36'] as const).map((key) => (
-              <div key={key} className="h-[54px] w-full">
-                {renderOutside(key, key, 'lg')}
-              </div>
-            ))}
+      {/* Desktop — fixed grid scaled to the board column (sidebar-aware via container width). */}
+      <div ref={desktopContainerRef} className="hidden w-full min-w-0 md:block">
+        <div
+          className="relative mx-auto overflow-clip"
+          style={{
+            width: ROULETTE_DESKTOP_FIELD_WIDTH * desktopScale,
+            height: ROULETTE_DESKTOP_FIELD_HEIGHT * desktopScale,
+          }}
+        >
+          <div
+            className="absolute top-0 left-1/2 origin-top"
+            style={{
+              width: ROULETTE_DESKTOP_FIELD_WIDTH,
+              transform: `translateX(-50%) scale(${desktopScale})`,
+            }}
+          >
+            {desktopGrid}
           </div>
-          <div className="bg-transparent" />
-        </div>
-
-        <div className="mt-[4px] grid grid-cols-[54px_1fr_54px] gap-[4px]">
-          <div className="bg-transparent" />
-          <div className="grid grid-cols-6 gap-[4px]">
-            {(
-              [
-                ['1-18', '1-18'],
-                ['Even', 'Even'],
-                ['Red', 'Red'],
-                ['Black', 'Black'],
-                ['Odd', 'Odd'],
-                ['19-36', '19-36'],
-              ] as const
-            ).map(([id, label]) => (
-              <div key={id} className="h-[54px] w-full">
-                {renderOutside(id, label, 'md', {
-                  color: id === 'Red' ? 'red' : 'black',
-                })}
-              </div>
-            ))}
-          </div>
-          <div className="bg-transparent" />
         </div>
       </div>
     </div>

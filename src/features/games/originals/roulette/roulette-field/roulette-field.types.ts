@@ -15,6 +15,8 @@ export interface RouletteFieldProps {
   /** Winning straight number (blinks). Use null when idle. */
   winningNumber?: number | null;
   disabled?: boolean;
+  /** When true (desktop sidebar expanded), slightly caps fit-scale for breathing room (betstrike chat-open analogue). */
+  compact?: boolean;
   onCellClick?: (cellId: string) => void;
   onHoverNumbersChange?: (numbers: readonly number[]) => void;
   className?: string;
