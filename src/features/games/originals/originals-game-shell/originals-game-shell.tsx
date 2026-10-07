@@ -8,6 +8,9 @@ import { cn } from '#ui/lib/cn';
  * State, API calls and game rules belong to an app-side controller. That controller
  * feeds controlled config and board adapters into this shell, keeping both views in
  * sync without coupling the design-system package to a game engine.
+ *
+ * On mobile/tablet (max-lg) the board is ordered above the config so players see the
+ * game first; on desktop (lg+) config stays on the left via lg:order-*.
  */
 export function OriginalsGameShell({
   header,
@@ -20,7 +23,7 @@ export function OriginalsGameShell({
     <div
       className={cn(
         'flex w-full min-w-0 flex-col',
-        theatreMode && 'h-full min-h-0',
+        theatreMode && 'h-full min-h-0 flex-1',
         className,
       )}
     >
@@ -33,11 +36,11 @@ export function OriginalsGameShell({
           theatreMode && 'h-full flex-1 overflow-hidden',
         )}
       >
-        {/* DOM order matches visual order on all breakpoints (config, then board). */}
+        {/* Mobile: board (order-1) above config (order-2). Desktop: config left, board right. */}
         <div
           data-slot="originals-game-config"
           className={cn(
-            'w-full shrink-0 lg:w-fit',
+            'order-2 w-full shrink-0 lg:order-1 lg:w-fit',
             theatreMode && 'lg:h-full lg:min-h-0',
           )}
         >
@@ -47,7 +50,7 @@ export function OriginalsGameShell({
         <div
           data-slot="originals-game-board"
           className={cn(
-            'relative isolate flex w-full min-w-0 flex-col max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden',
+            'relative isolate order-1 flex w-full min-w-0 flex-col max-lg:overflow-visible lg:order-2 lg:min-h-0 lg:flex-1 lg:overflow-hidden',
             theatreMode && 'lg:h-full',
           )}
         >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useArgs } from 'storybook/preview-api';
@@ -61,7 +61,11 @@ function RouletteCompositionPlayground({
     reducedMotion,
     resultHoldMs: reducedMotion ? 1200 : 2800,
   });
-  const { state } = session;
+  const { state, setVolume } = session;
+
+  useEffect(() => {
+    setVolume(args.volume);
+  }, [args.volume, setVolume]);
   const autoBetActive = state.remaining > 0;
   const fieldsDisabled = session.fieldsDisabled;
   const autobetAction = resolveOriginalsAutobetAction({
@@ -75,11 +79,6 @@ function RouletteCompositionPlayground({
     [state.history],
   );
 
-  const winMultiplier =
-    state.settlement && state.settlement.winningStake > 0
-      ? state.settlement.payout / state.settlement.winningStake
-      : 0;
-
   const winRatePct =
     state.round === 0 ? 0 : Math.round((state.wins / state.round) * 100);
 
@@ -89,7 +88,6 @@ function RouletteCompositionPlayground({
   const balanceDelta = state.balance - 1000;
   const netProfitLabel = `${balanceDelta >= 0 ? '+' : ''}${formatRouletteMoney(balanceDelta)}`;
   const totalLabel = `Stake ${formatRouletteMoney(session.totalStake)} | Balance ${formatRouletteMoney(state.balance)}`;
-  const multiplierLabel = `x${winMultiplier > 0 ? winMultiplier.toFixed(2) : '0.00'}`;
 
   return (
     <div
@@ -199,8 +197,9 @@ function RouletteCompositionPlayground({
           open: state.showWinModal,
           title: 'You win',
           multiplierLabel: 'Multiplier',
-          multiplier: multiplierLabel,
-          formattedWinAmount: formatRouletteMoney(state.settlement?.payout ?? 0),
+          multiplier: state.winMultiplier,
+          // Total payout (settle.payout), not net profit - matches Mines/Keno/Dice/Towers.
+          formattedWinAmount: state.winAmount,
           currencyIcon: rouletteStoryWinCurrencyIcon,
           volume: args.volume,
           reducedMotion,

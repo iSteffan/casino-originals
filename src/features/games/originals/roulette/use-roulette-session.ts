@@ -12,6 +12,14 @@ import {
 } from './roulette-engine';
 import { ROULETTE_CHIPS, type RouletteWheelNumber } from './roulette.constants';
 
+import {
+  playRouletteSound,
+  preloadRouletteSounds,
+  setRouletteSoundsVolume,
+  stopRouletteSounds,
+  type RouletteSoundName,
+} from './roulette-sounds';
+
 import { getConfiguredMaxRounds } from '#ui/features/games/originals/core/originals-autobet';
 
 export interface RouletteHistoryItem {
@@ -33,6 +41,10 @@ export interface RouletteSessionState {
   round: number;
   history: RouletteHistoryItem[];
   showWinModal: boolean;
+  /** Formatted total payout (gross return on winning bets) - same kind of value peers pass to GameWinModal. */
+  winAmount: string;
+  /** Total-return multiplier label, e.g. x2.00 (payout / winningStake). */
+  winMultiplier: string;
   balance: number;
   highlightedNumbers: number[];
   wins: number;
@@ -42,6 +54,18 @@ export interface UseRouletteSessionOptions {
   initialBalance?: number;
   resultHoldMs?: number;
   reducedMotion?: boolean;
+}
+
+function formatRouletteWinAmount(amount: number): string {
+  return amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatRouletteWinMultiplier(payout: number, winningStake: number): string {
+  const mult = winningStake > 0 ? payout / winningStake : 0;
+  return `x${mult > 0 ? mult.toFixed(2) : '0.00'}`;
 }
 
 function isBusy(state: RouletteSessionState): boolean {
@@ -68,6 +92,8 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     round: 0,
     history: [],
     showWinModal: false,
+    winAmount: '0.00',
+    winMultiplier: 'x0.00',
     balance: initialBalance,
     highlightedNumbers: [],
     wins: 0,
@@ -77,7 +103,37 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reducedMotionRef = useRef(reducedMotion);
-  reducedMotionRef.current = reducedMotion;
+  const [theatreMode, setTheatreMode] = useState(false);
+  const [volume, setVolume] = useState(0.75);
+  const volumeRef = useRef(volume);
+  const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
+
+  useEffect(() => {
+    reducedMotionRef.current = reducedMotion;
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  const playSound = useCallback((name: RouletteSoundName) => {
+    const audio = playRouletteSound(name, volumeRef.current, (settled) => {
+      activeSoundsRef.current.delete(settled);
+    });
+    if (audio) activeSoundsRef.current.add(audio);
+  }, []);
+
+  useEffect(() => {
+    preloadRouletteSounds();
+    const activeSounds = activeSoundsRef.current;
+    return () => {
+      stopRouletteSounds(activeSounds);
+    };
+  }, []);
+
+  useEffect(() => {
+    setRouletteSoundsVolume(activeSoundsRef.current, volume);
+  }, [volume]);
 
   const update = useCallback((next: RouletteSessionState) => {
     if (disposedRef.current) return;
@@ -106,6 +162,9 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
       const current = stateRef.current;
       const settlement = settleRouletteBets(current.bets, result);
       const won = settlement.payout > 0;
+      // Peer GameWinModal amount = total payout (gross return), not net profit.
+      // Stake was deducted when the spin started; credit payout here so the
+      // modal amount matches the balance credit (same pattern as Mines/Dice).
       const historyItem: RouletteHistoryItem = {
         id: `roll-${current.round + 1}-${result}-${Date.now()}`,
         number: result,
@@ -121,7 +180,12 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
         history: [historyItem, ...current.history].slice(0, 29),
         remaining: Math.max(0, current.remaining - 1),
         showWinModal: won,
-        balance: Number((current.balance + settlement.profit).toFixed(2)),
+        winAmount: formatRouletteWinAmount(settlement.payout),
+        winMultiplier: formatRouletteWinMultiplier(
+          settlement.payout,
+          settlement.winningStake,
+        ),
+        balance: Number((current.balance + settlement.payout).toFixed(2)),
         highlightedNumbers: [result],
         wins: current.wins + (won ? 1 : 0),
       });
@@ -147,6 +211,8 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
 
     const result = getRandomRouletteNumber();
     clearHoldTimer();
+    // Reserve stake now (peer wallet.applyRound deducts bet up front).
+    const nextBalance = Number((current.balance - stake).toFixed(2));
     update({
       ...current,
       spinning: true,
@@ -154,14 +220,20 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
       result: null,
       settlement: null,
       showWinModal: false,
+      winAmount: '0.00',
+      winMultiplier: 'x0.00',
       highlightedNumbers: [],
+      balance: nextBalance,
     });
+
+    // Ball throw / spin whoosh - plays when the wheel spin (and ball motion) starts.
+    playSound('ballSpin');
 
     if (reducedMotionRef.current) {
       setTimeout(() => finishSpin(result), 0);
     }
     return true;
-  }, [finishSpin, update]);
+  }, [finishSpin, playSound, update]);
 
   const stopAutoBet = useCallback(() => {
     const current = stateRef.current;
@@ -193,6 +265,10 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
 
   return {
     state,
+    theatreMode,
+    volume,
+    setTheatreMode,
+    setVolume,
     fieldsDisabled: isBusy(state),
     canStartManualBet: !isBusy(state) && state.bets.length > 0 && state.mode === 'manual',
     canStartAutoBet:

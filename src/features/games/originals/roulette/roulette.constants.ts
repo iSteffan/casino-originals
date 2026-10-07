@@ -1,4 +1,4 @@
-﻿/** European roulette red numbers (1вЂ“36). Zero is green. */
+﻿/** European roulette red numbers (1–36). Zero is green. */
 export const ROULETTE_RED_NUMBERS = [
   1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36,
 ] as const;
@@ -12,7 +12,7 @@ export const ROULETTE_BLACK_NUMBERS = ALL_NUMBERS.filter(
 export const ROULETTE_EVEN_NUMBERS = ALL_NUMBERS.filter((n) => n !== 0 && n % 2 === 0);
 export const ROULETTE_ODD_NUMBERS = ALL_NUMBERS.filter((n) => n % 2 === 1);
 
-/** Desktop topв†’bottom columns (European table layout). */
+/** Desktop top–bottom columns (European table layout). */
 export const ROULETTE_ROW_1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] as const;
 export const ROULETTE_ROW_2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35] as const;
 export const ROULETTE_ROW_3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34] as const;
@@ -81,3 +81,21 @@ export function calculateRouletteSpinToRotation(
 export const ROULETTE_DESKTOP_FIELD_WIDTH = 14 * 54 + 13 * 4;
 /** Desktop: 3x54+gaps number grid + mt + outside + mt + outside. */
 export const ROULETTE_DESKTOP_FIELD_HEIGHT = 3 * 54 + 2 * 4 + 4 + 54 + 4 + 54;
+
+/**
+ * Mobile stacked table natural width:
+ * numbers (3×60 + 2×4) + dozens (60 + mr 4) + even-money (60 + mr 4) = 316.
+ */
+export const ROULETTE_MOBILE_FIELD_WIDTH = 3 * 60 + 2 * 4 + 60 + 4 + 60 + 4;
+
+/**
+ * Mobile stacked table natural height (numbers column drives it):
+ * zero row + gap + 12 numbers + 2:1 (13×29 + 12×4) = 458.
+ */
+export const ROULETTE_MOBILE_FIELD_HEIGHT = 29 + 4 + 13 * 29 + 12 * 4;
+
+/**
+ * Extra room above/below the scaled field so stacked chips, rings, and win glows
+ * are not clipped. Betstrike avoided a tight overflow-clip size-box for this reason.
+ */
+export const ROULETTE_FIELD_OVERFLOW_PAD = 40;

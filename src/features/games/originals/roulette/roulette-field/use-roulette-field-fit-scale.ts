@@ -8,15 +8,19 @@ import {
 } from '../roulette.constants';
 
 /**
- * Scales the fixed desktop roulette grid to the container width.
+ * Scales a fixed-size roulette grid to the container width.
  * Betstrike used viewport + chat-open CSS scales (`md:scale-85`, `xl:scale-75`
  * when chat open). With OriginalsGameShell (config beside board) those viewport
  * breakpoints alone still overflow; fitting to the board column matches the
  * intent and keeps lg/xl sidebar-open layouts from clipping.
+ *
+ * Also used for the mobile stacked table (~316px) on narrow viewports (~360px)
+ * so cells are not clipped by overflow-x.
  */
 export function useRouletteFieldFitScale(
   containerRef: RefObject<HTMLElement | null>,
   enabled: boolean,
+  naturalWidth: number = ROULETTE_DESKTOP_FIELD_WIDTH,
 ): number {
   const [scale, setScale] = useState(1);
 
@@ -32,14 +36,14 @@ export function useRouletteFieldFitScale(
     const update = () => {
       const width = container.clientWidth;
       if (width <= 0) return;
-      setScale(Math.min(1, width / ROULETTE_DESKTOP_FIELD_WIDTH));
+      setScale(Math.min(1, width / naturalWidth));
     };
 
     update();
     const observer = new ResizeObserver(update);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [containerRef, enabled]);
+  }, [containerRef, enabled, naturalWidth]);
 
   return scale;
 }

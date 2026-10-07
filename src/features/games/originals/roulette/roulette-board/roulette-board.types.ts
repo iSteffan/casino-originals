@@ -8,6 +8,8 @@ export interface RouletteBoardProps {
   lastResults: RouletteLastResultsProps;
   wheel: RouletteWheelProps;
   field: RouletteFieldProps;
+  /** When true, board fills the theatre column height like peer originals. */
+  theatreMode?: boolean;
   overlay?: ReactNode;
   className?: string;
 }

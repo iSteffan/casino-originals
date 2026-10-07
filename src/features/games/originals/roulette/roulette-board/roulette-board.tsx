@@ -11,13 +11,17 @@ export function RouletteBoard({
   lastResults,
   wheel,
   field,
+  theatreMode = false,
   overlay,
   className,
 }: RouletteBoardProps) {
   return (
     <div
       className={cn(
-        'bg-ds-surface-secondary relative flex w-full min-w-0 flex-col overflow-x-clip rounded-ds-sm p-4',
+        // No overflow-x-clip: CSS makes overflow-x:clip force overflow-y:clip too,
+        // which cuts off stacked chips / win glows above the top row of the table.
+        'bg-ds-surface-secondary relative flex w-full min-w-0 flex-col rounded-ds-sm p-4',
+        theatreMode && 'min-h-0 flex-1 lg:h-full',
         className,
       )}
     >
@@ -29,17 +33,23 @@ export function RouletteBoard({
         className={lastResults.className}
       />
 
-      <div className="relative flex w-full flex-col items-center gap-6">
-        <div className="relative flex justify-center">
+      <div
+        className={cn(
+          'relative flex w-full flex-col items-center gap-6',
+          theatreMode && 'min-h-0 flex-1 justify-center',
+        )}
+      >
+        {/* w-full: GameWinModal positions absolute inset-x; wheel-only width (~262px) forces flex-wrap stack */}
+        <div className="relative flex w-full justify-center">
           <RouletteWheel {...wheel} />
           {overlay ? (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <div className="pointer-events-none absolute inset-0 z-20">
               {overlay}
             </div>
           ) : null}
         </div>
 
-        <div className="flex w-full min-w-0 justify-center overflow-x-clip">
+        <div className="flex w-full min-w-0 justify-center">
           <RouletteField {...field} />
         </div>
       </div>

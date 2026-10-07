@@ -101,6 +101,7 @@ export function RouletteOriginalsView({
             }
             board={
               <RouletteBoard
+                theatreMode={theatreMode}
                 lastResults={board.lastResults}
                 wheel={board.wheel}
                 field={board.field}

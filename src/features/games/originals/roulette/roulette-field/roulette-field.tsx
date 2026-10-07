@@ -6,6 +6,9 @@ import { RouletteCell } from '../roulette-cell/roulette-cell';
 import {
   ROULETTE_DESKTOP_FIELD_HEIGHT,
   ROULETTE_DESKTOP_FIELD_WIDTH,
+  ROULETTE_FIELD_OVERFLOW_PAD,
+  ROULETTE_MOBILE_FIELD_HEIGHT,
+  ROULETTE_MOBILE_FIELD_WIDTH,
   ROULETTE_RANGE_MAP,
   ROULETTE_ROW_1,
   ROULETTE_ROW_2,
@@ -31,7 +34,13 @@ export function RouletteField({
   'aria-label': ariaLabel = 'Roulette betting field',
 }: RouletteFieldProps) {
   const desktopContainerRef = useRef<HTMLDivElement>(null);
+  const mobileContainerRef = useRef<HTMLDivElement>(null);
   const fitScale = useRouletteFieldFitScale(desktopContainerRef, true);
+  const mobileFitScale = useRouletteFieldFitScale(
+    mobileContainerRef,
+    true,
+    ROULETTE_MOBILE_FIELD_WIDTH,
+  );
   // Betstrike also dropped scale further when chat/sidebar was open; keep a little
   // breathing room once the grid already fits, without causing overflow.
   const desktopScale = compact ? Math.min(fitScale, 0.95) : fitScale;
@@ -166,75 +175,105 @@ export function RouletteField({
     </div>
   );
 
+  const mobileGrid = (
+    <div className="flex w-fit flex-row-reverse">
+      <div className="grid w-fit grid-cols-[repeat(3,60px)] gap-[4px]">
+        <div className="col-span-3">{renderStraight(0)}</div>
+        {(
+          [
+            { row: ROULETTE_ROW_3, label: 'Row3' as const },
+            { row: ROULETTE_ROW_2, label: 'Row2' as const },
+            { row: ROULETTE_ROW_1, label: 'Row1' as const },
+          ] as const
+        ).map(({ row, label }) => (
+          <div key={label} className="flex flex-col gap-[4px]">
+            {row.map(renderStraight)}
+            {renderTwoToOne(label)}
+          </div>
+        ))}
+      </div>
+
+      <div className="mr-[4px] grid w-fit grid-rows-[30px_1fr_1fr_1fr_30px] gap-[4px]">
+        <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
+        {(['1-12', '13-24', '25-36'] as const).map((key) => (
+          <div key={key} className="h-full w-[60px]">
+            {renderOutside(key, key, 'lg', { rotateLabel: true })}
+          </div>
+        ))}
+        <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
+      </div>
+
+      <div className="mr-[4px] grid w-fit grid-rows-[30px_repeat(6,_1fr)_30px] gap-[4px]">
+        <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
+        {(
+          [
+            ['1-18', '1-18'],
+            ['Even', 'Even'],
+            ['Red', 'Red'],
+            ['Black', 'Black'],
+            ['Odd', 'Odd'],
+            ['19-36', '19-36'],
+          ] as const
+        ).map(([id, label]) => (
+          <div key={id} className="h-full w-[60px]">
+            {renderOutside(id, label, 'md', {
+              rotateLabel: true,
+              color: id === 'Red' ? 'red' : 'black',
+            })}
+          </div>
+        ))}
+        <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
+      </div>
+    </div>
+  );
+
   return (
     <div
       role="group"
       aria-label={ariaLabel}
       className={cn('w-full min-w-0 text-ds-white', className)}
     >
-      {/* Mobile — unchanged stacked layout */}
-      <div className="flex w-fit flex-row-reverse md:hidden">
-        <div className="grid w-fit grid-cols-[repeat(3,60px)] gap-[4px]">
-          <div className="col-span-3">{renderStraight(0)}</div>
-          {(
-            [
-              { row: ROULETTE_ROW_3, label: 'Row3' as const },
-              { row: ROULETTE_ROW_2, label: 'Row2' as const },
-              { row: ROULETTE_ROW_1, label: 'Row1' as const },
-            ] as const
-          ).map(({ row, label }) => (
-            <div key={label} className="flex flex-col gap-[4px]">
-              {row.map(renderStraight)}
-              {renderTwoToOne(label)}
-            </div>
-          ))}
-        </div>
-
-        <div className="mr-[4px] grid w-fit grid-rows-[30px_1fr_1fr_1fr_30px] gap-[4px]">
-          <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
-          {(['1-12', '13-24', '25-36'] as const).map((key) => (
-            <div key={key} className="h-full w-[60px]">
-              {renderOutside(key, key, 'lg', { rotateLabel: true })}
-            </div>
-          ))}
-          <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
-        </div>
-
-        <div className="mr-[4px] grid w-fit grid-rows-[30px_repeat(6,_1fr)_30px] gap-[4px]">
-          <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
-          {(
-            [
-              ['1-18', '1-18'],
-              ['Even', 'Even'],
-              ['Red', 'Red'],
-              ['Black', 'Black'],
-              ['Odd', 'Odd'],
-              ['19-36', '19-36'],
-            ] as const
-          ).map(([id, label]) => (
-            <div key={id} className="h-full w-[60px]">
-              {renderOutside(id, label, 'md', {
-                rotateLabel: true,
-                color: id === 'Red' ? 'red' : 'black',
-              })}
-            </div>
-          ))}
-          <div className="pointer-events-none h-[30px] w-[60px] bg-transparent" />
-        </div>
-      </div>
-
-      {/* Desktop — fixed grid scaled to the board column (sidebar-aware via container width). */}
-      <div ref={desktopContainerRef} className="hidden w-full min-w-0 md:block">
+      {/* Mobile — stacked layout, fit-scaled on narrow viewports (~360px). */}
+      <div ref={mobileContainerRef} className="w-full min-w-0 md:hidden">
         <div
-          className="relative mx-auto overflow-clip"
+          className="relative mx-auto"
           style={{
-            width: ROULETTE_DESKTOP_FIELD_WIDTH * desktopScale,
-            height: ROULETTE_DESKTOP_FIELD_HEIGHT * desktopScale,
+            width: ROULETTE_MOBILE_FIELD_WIDTH * mobileFitScale,
+            height:
+              ROULETTE_MOBILE_FIELD_HEIGHT * mobileFitScale +
+              ROULETTE_FIELD_OVERFLOW_PAD,
           }}
         >
           <div
-            className="absolute top-0 left-1/2 origin-top"
+            className="absolute left-1/2 origin-top"
             style={{
+              top: ROULETTE_FIELD_OVERFLOW_PAD,
+              width: ROULETTE_MOBILE_FIELD_WIDTH,
+              transform: `translateX(-50%) scale(${mobileFitScale})`,
+            }}
+          >
+            {mobileGrid}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop — fixed grid scaled to the board column (sidebar-aware via container width).
+          Overflow stays visible so stacked chips / win glows above the top row are not clipped
+          (betstrike scaled a w-fit table without a tight overflow-clip size-box). */}
+      <div ref={desktopContainerRef} className="hidden w-full min-w-0 md:block">
+        <div
+          className="relative mx-auto"
+          style={{
+            width: ROULETTE_DESKTOP_FIELD_WIDTH * desktopScale,
+            height:
+              ROULETTE_DESKTOP_FIELD_HEIGHT * desktopScale +
+              ROULETTE_FIELD_OVERFLOW_PAD,
+          }}
+        >
+          <div
+            className="absolute left-1/2 origin-top"
+            style={{
+              top: ROULETTE_FIELD_OVERFLOW_PAD,
               width: ROULETTE_DESKTOP_FIELD_WIDTH,
               transform: `translateX(-50%) scale(${desktopScale})`,
             }}
