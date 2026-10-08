@@ -16,14 +16,8 @@ import {
   isAutobetActive,
 } from '#ui/features/games/originals/core/originals-autobet';
 import { resolveOriginalsAutobetAction } from '#ui/features/games/originals/originals-config/originals-config-autobet.utils';
-import type { AutobetSessionState } from '#ui/features/games/originals/shared/autobet-session-status/autobet-session-status.types';
-import type { GameWinModalProps } from '#ui/features/games/originals/shared/game-win-modal/game-win-modal.types';
 import { useBetAmountDisplay } from '#ui/features/wallet/use-bet-amount-display';
 import {
-  formatSignedAmountLabel,
-  formatWalletAmount,
-  formatWalletAmountLabel,
-  formatWinRate,
   getFiatStakeUsd,
   SINGLE_BET_THRESHOLD_USD,
 } from '#ui/features/wallet/wallet-balances';
@@ -44,20 +38,6 @@ function CurrencyIcon({ src, size }: { src: string; size: 20 | 32 }) {
       showSkeleton={false}
     />
   );
-}
-
-function mapAutobetSessionState(
-  auto: PlinkoSession['auto'],
-  metrics: PlinkoSession['metrics'],
-): AutobetSessionState {
-  if (isAutobetActive(auto)) return 'live';
-  if (auto.kind === 'failed' && auto.reason === 'insufficient-balance') {
-    return 'insufficient-balance';
-  }
-  if (auto.kind === 'failed') return 'interrupted';
-  if (auto.kind === 'paused') return 'paused';
-  if (metrics.roundsCompleted > 0) return 'complete';
-  return 'ready-to-start';
 }
 
 /**
@@ -113,14 +93,6 @@ export function usePlinkoOriginalsController(session: PlinkoSession): PlinkoOrig
       mode: session.mode,
       onModeChange: session.setMode,
       tabsDisabled: session.fieldsDisabled,
-      autobetSession: {
-        state: mapAutobetSessionState(session.auto, session.metrics),
-        totalWagered: formatWalletAmountLabel(
-          formatWalletAmount(session.metrics.totalWagered, wallet.currencyId, true),
-        ),
-        netProfit: formatSignedAmountLabel(session.metrics.netProfit, wallet.currencyId, true),
-        winRate: formatWinRate(session.metrics.wins, session.metrics.losses),
-      },
       // Betstrike keeps the manual button live while balls fall: each click drops another ball.
       manualActionLabel: plinkoStoryLabels.dropBall,
       autoActionLabel: autobetAction.label,
@@ -191,24 +163,12 @@ export function usePlinkoOriginalsController(session: PlinkoSession): PlinkoOrig
     theatreMode: theatreLayoutActive,
     lastResults: session.history,
     lastResultsAriaLabel: plinkoStoryLabels.lastResults,
-    resultAnnouncement: session.showWinModal ? undefined : session.resultAnnouncement,
-  };
-
-  const winOverlay: GameWinModalProps = {
-    open: session.showWinModal,
-    title: plinkoStoryLabels.winTitle,
-    multiplierLabel: plinkoStoryLabels.multiplier,
-    multiplier: session.winMultiplier,
-    formattedWinAmount: session.winAmount,
-    volume: session.volume,
-    reducedMotion,
-    currencyIcon: <CurrencyIcon src={wallet.currentBalance.icon} size={32} />,
+    resultAnnouncement: session.resultAnnouncement,
   };
 
   return {
     config,
     board,
-    winOverlay,
     header: {
       title: plinkoStoryLabels.title,
       volume: session.volume,

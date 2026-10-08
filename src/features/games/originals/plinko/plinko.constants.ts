@@ -111,11 +111,4 @@ export const PLINKO_AUTOBET_DELAY_MS = {
 /** Betstrike session keeps the last 20 landed balls in history. */
 export const PLINKO_HISTORY_LIMIT = 20;
 
-/** How long the shared win modal stays up after the latest winning landing. */
-export const PLINKO_WIN_MODAL_HOLD_MS = {
-  normal: 1600,
-  turbo: 1000,
-  reducedMotion: 1200,
-} as const;
-
 export const PLINKO_PIN_SRC = '/img/games/plinko/pin-circle.svg';

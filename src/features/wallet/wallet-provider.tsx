@@ -51,7 +51,8 @@ const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [currencyId, setCurrencyId] = useState<CashierCurrencyId>('btc');
-  const [displayFiat, setDisplayFiat] = useState(false);
+  // Cashier "Display in Fiat" is on by default.
+  const [displayFiat, setDisplayFiat] = useState(true);
   const [balances, setBalances] = useState(INITIAL_WALLET_BALANCES);
 
   const currentBalance =

@@ -12,14 +12,8 @@ import {
   PLINKO_DEFAULT_RISK,
   PLINKO_DEFAULT_ROWS,
   PLINKO_HISTORY_LIMIT,
-  PLINKO_WIN_MODAL_HOLD_MS,
 } from './plinko.constants';
-import {
-  formatPlinkoMultiplier,
-  resolvePlinkoTable,
-  rollPlinkoBucket,
-  settlePlinkoDrop,
-} from './plinko-engine';
+import { resolvePlinkoTable, rollPlinkoBucket, settlePlinkoDrop } from './plinko-engine';
 import {
   playPlinkoSound,
   preloadPlinkoSounds,
@@ -41,14 +35,10 @@ import {
 } from '#ui/features/games/originals/core/originals-autobet';
 import type { OriginalsConfigMode } from '#ui/features/games/originals/originals-config/originals-config.types';
 import {
-  formatWalletAmount,
-  formatWalletAmountLabel,
   getCryptoStakeFloorRate,
-  getDefaultCryptoBetAmount,
   WALLET_CRYPTO_FRACTION_DIGITS,
 } from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
-import { shouldReduceMotion } from '#ui/lib/motion';
 
 /** One accepted bet whose ball is still in flight (betstrike `PlinkoDrop`). */
 export interface PlinkoSessionDrop {
@@ -73,9 +63,6 @@ interface PlinkoSessionState {
   drops: PlinkoSessionDrop[];
   history: PlinkoLastResultItem[];
   resultAnnouncement?: PlinkoResultAnnouncement;
-  showWinModal: boolean;
-  winMultiplier: string;
-  winAmount: string;
   auto: OriginalAutobetStatus;
   metrics: OriginalAutobetMetrics;
   initialBet: string;
@@ -132,10 +119,10 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
 
   const [state, setState] = useState<PlinkoSessionState>(() => {
     const table = resolvePlinkoTable({ risk: initialRisk, rows: initialRows });
-    const betAmount = getDefaultCryptoBetAmount(wallet.currencyId);
+    // Bet field starts empty (stake 0), same as the other originals.
     return {
       mode: initialMode,
-      betAmount,
+      betAmount: '0',
       risk: table.configuration?.internalId ?? PLINKO_DEFAULT_RISK,
       rows: table.rows ?? PLINKO_DEFAULT_ROWS,
       turboMode: initialTurboMode,
@@ -144,27 +131,21 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
       volume: initialVolume,
       drops: [],
       history: [],
-      showWinModal: false,
-      winMultiplier: 'x0',
-      winAmount: '0.00',
       auto: { kind: 'idle' },
       metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
-      initialBet: betAmount,
+      initialBet: '0',
     };
   });
 
   const stateRef = useRef(state);
   const dropSeqRef = useRef(0);
-  const winModalTimerRef = useRef<number | null>(null);
   const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
   const volumeRef = useRef(state.volume);
-  const reducedMotionRef = useRef(reducedMotion);
 
   // Handlers read the latest wallet/settings from refs (synced after each render).
   useLayoutEffect(() => {
     walletRef.current = wallet;
     volumeRef.current = state.volume;
-    reducedMotionRef.current = reducedMotion;
   });
 
   /** Synchronous commit so rapid drops / same-frame landings never read stale state. */
@@ -182,18 +163,10 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
     if (audio) activeSoundsRef.current.add(audio);
   };
 
-  const clearWinModalTimer = () => {
-    if (winModalTimerRef.current !== null) {
-      window.clearTimeout(winModalTimerRef.current);
-      winModalTimerRef.current = null;
-    }
-  };
-
   useEffect(() => {
     preloadPlinkoSounds();
     const activeSounds = activeSoundsRef.current;
     return () => {
-      clearWinModalTimer();
       stopPlinkoSounds(activeSounds);
     };
   }, []);
@@ -278,36 +251,12 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
       multiplier: drop.multiplier,
       color: event.color,
     };
-    // Net win (payout above stake) opens the shared win modal.
-    const showWin = drop.multiplier > 1;
-    const patch: Partial<PlinkoSessionState> = {
+    commit({
       drops: current.drops.filter((entry) => entry.id !== drop.id),
       history: [result, ...current.history].slice(0, PLINKO_HISTORY_LIMIT),
       resultAnnouncement: { id: drop.id, message: `Landed ${drop.multiplier}x.` },
-    };
-    if (showWin) {
-      patch.showWinModal = true;
-      patch.winMultiplier = formatPlinkoMultiplier(drop.multiplier);
-      patch.winAmount = formatWalletAmountLabel(
-        formatWalletAmount(drop.payoutAmount, currentWallet.currencyId, currentWallet.displayFiat),
-      );
-    }
-    commit(patch);
+    });
     playSound('land');
-
-    if (showWin) {
-      clearWinModalTimer();
-      const holdMs =
-        reducedMotionRef.current || shouldReduceMotion()
-          ? PLINKO_WIN_MODAL_HOLD_MS.reducedMotion
-          : current.turboMode
-            ? PLINKO_WIN_MODAL_HOLD_MS.turbo
-            : PLINKO_WIN_MODAL_HOLD_MS.normal;
-      winModalTimerRef.current = window.setTimeout(() => {
-        winModalTimerRef.current = null;
-        commit({ showWinModal: false });
-      }, holdMs);
-    }
   };
 
   const runAutoRound = useEffectEvent(() => {
@@ -460,15 +409,15 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
     commitCryptoBetAmount(capped.toFixed(digits));
   };
 
-  // Currency switch resets the stake to that currency's default (blackjack parity).
-  const resetBetForCurrency = useEffectEvent((currencyId: typeof wallet.currencyId) => {
+  // Currency switch clears the stake (empty bet field), same as the other originals.
+  const resetBetForCurrency = useEffectEvent(() => {
     if (isBusy(stateRef.current)) return;
-    const next = getDefaultCryptoBetAmount(currencyId);
+    const next = '0';
     if (stateRef.current.betAmount === next) return;
     applySettingsEdit({ betAmount: next, initialBet: next });
   });
   useEffect(() => {
-    resetBetForCurrency(wallet.currencyId);
+    resetBetForCurrency();
   }, [wallet.currencyId]);
 
   const stopAutoBetOnLeave = useEffectEvent(() => stopAutoBet());

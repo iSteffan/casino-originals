@@ -6,6 +6,7 @@ import { CoinflipPage } from '#ui/features/games/originals/coinflip/coinflip-pag
 import { DicePage } from '#ui/features/games/originals/dice/dice-page';
 import { KenoPage } from '#ui/features/games/originals/keno/keno-page';
 import { MinesPage } from '#ui/features/games/originals/mines/mines-page';
+import { PlinkoPage } from '#ui/features/games/originals/plinko/plinko-page';
 import { RoulettePage } from '#ui/features/games/originals/roulette/roulette-page';
 import { TowersPage } from '#ui/features/games/originals/towers/towers-page';
 import { APP_SIDEBAR_GAMES } from '#ui/layouts/app-sidebar/app-sidebar-games';
@@ -16,6 +17,7 @@ const GAME_PAGES = {
   dice: DicePage,
   keno: KenoPage,
   mines: MinesPage,
+  plinko: PlinkoPage,
   roulette: RoulettePage,
   towers: TowersPage,
 } as const;

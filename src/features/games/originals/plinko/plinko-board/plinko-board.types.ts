@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 import type { PlinkoLastResultItem } from '#ui/features/games/originals/plinko/plinko-last-results/plinko-last-results.types';
 
 export interface PlinkoResultAnnouncement {
@@ -41,10 +39,5 @@ export interface PlinkoBoardProps {
   turboMode?: boolean;
   reducedMotion?: boolean;
   theatreMode?: boolean;
-  /**
-   * Overlay (e.g. shared GameWinModal) mounted over the full-width playfield so
-   * the modal card can use the whole board width without wrapping.
-   */
-  overlay?: ReactNode;
   className?: string;
 }

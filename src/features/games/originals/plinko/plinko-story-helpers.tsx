@@ -73,8 +73,6 @@ export const plinkoStoryLabels = {
   title: 'Plinko',
   dropBall: 'Drop Ball',
   turboMode: 'Turbo mode',
-  winTitle: 'You win!',
-  multiplier: 'Multiplier',
   lastResults: plinkoStoryLastResultsAriaLabel,
 };
 

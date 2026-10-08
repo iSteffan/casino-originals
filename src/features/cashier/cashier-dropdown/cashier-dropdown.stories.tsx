@@ -18,7 +18,7 @@ import {
 
 function CashierDropdownPlayground() {
   const [currencyId, setCurrencyId] = useState<CashierCurrencyId>('btc');
-  const [displayFiat, setDisplayFiat] = useState(false);
+  const [displayFiat, setDisplayFiat] = useState(true);
   const currentBalance =
     CASHIER_BALANCES.find((balance) => balance.id === currencyId) ??
     CASHIER_BALANCES[0];

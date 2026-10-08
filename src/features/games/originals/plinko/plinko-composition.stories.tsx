@@ -50,7 +50,7 @@ function PlinkoCompositionPlayground({
   const view = usePlinkoOriginalsController(session);
   const { setVolume } = session;
 
-  // Volume drives sounds and the win-modal cue inside the session.
+  // Volume drives the drop/land sounds inside the session.
   useEffect(() => {
     setVolume(args.volume);
   }, [args.volume, setVolume]);
@@ -79,7 +79,6 @@ function PlinkoCompositionPlayground({
       <PlinkoOriginalsView
         config={view.config}
         board={view.board}
-        winOverlay={view.winOverlay}
         header={header}
         theatreMode={view.theatreMode}
         theatreModeActive={view.theatreModeActive}

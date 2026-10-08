@@ -154,7 +154,6 @@ export function PlinkoBoard({
   turboMode = false,
   reducedMotion = false,
   theatreMode = false,
-  overlay,
   className,
 }: PlinkoBoardProps) {
   return (
@@ -174,8 +173,6 @@ export function PlinkoBoard({
 
       <PlinkoLastResults items={lastResults} aria-label={lastResultsAriaLabel} />
 
-      {/* w-full wrapper: GameWinModal positions itself with absolute inset-x; a
-          narrow parent would force the amount to wrap under the multiplier. */}
       <div
         className={cn(
           'relative flex w-full min-w-0 flex-1 flex-col',
@@ -191,9 +188,6 @@ export function PlinkoBoard({
           reducedMotion={reducedMotion}
           theatreMode={theatreMode}
         />
-        {overlay ? (
-          <div className="pointer-events-none absolute inset-0 z-30">{overlay}</div>
-        ) : null}
       </div>
     </div>
   );

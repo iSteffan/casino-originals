@@ -6,10 +6,6 @@ import { PlinkoConfig } from './plinko-config/plinko-config';
 import type { PlinkoConfigProps } from './plinko-config/plinko-config.types';
 
 import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-shell/originals-game-shell';
-import {
-  GameWinModal,
-  type GameWinModalProps,
-} from '#ui/features/games/originals/shared/game-win-modal/game-win-modal';
 import { GameHeader } from '#ui/features/games/shared/game-player/game-header/game-header';
 import { TheatreModeSync } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
@@ -17,7 +13,6 @@ import { cn } from '#ui/lib/cn';
 export interface PlinkoOriginalsViewProps {
   config: PlinkoConfigProps;
   board: PlinkoBoardProps;
-  winOverlay: GameWinModalProps;
   header: {
     title: string;
     volume: number;
@@ -38,7 +33,6 @@ export interface PlinkoOriginalsViewProps {
 export function PlinkoOriginalsView({
   config,
   board,
-  winOverlay,
   header,
   theatreMode,
   theatreModeActive,
@@ -106,19 +100,6 @@ export function PlinkoOriginalsView({
                 lastResults={board.lastResults}
                 lastResultsAriaLabel={board.lastResultsAriaLabel}
                 resultAnnouncement={board.resultAnnouncement}
-                overlay={
-                  <GameWinModal
-                    open={winOverlay.open}
-                    title={winOverlay.title}
-                    multiplierLabel={winOverlay.multiplierLabel}
-                    multiplier={winOverlay.multiplier}
-                    formattedWinAmount={winOverlay.formattedWinAmount}
-                    currencyIcon={winOverlay.currencyIcon}
-                    volume={winOverlay.volume}
-                    reducedMotion={winOverlay.reducedMotion}
-                    contentClassName={winOverlay.contentClassName}
-                  />
-                }
               />
             }
           />
