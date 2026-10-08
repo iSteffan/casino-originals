@@ -22,6 +22,10 @@
 @import './features/games/originals/blackjack/blackjack.css';
 @import './features/games/originals/roulette/roulette.css';
 @import './features/games/originals/roulette/roulette-cell/roulette-cell.css';
+@import './features/games/originals/plinko/plinko-ball/plinko-ball.css';
+@import './features/games/originals/plinko/plinko-last-results/plinko-last-results.css';
+@import './features/games/originals/plinko/plinko-multiplier/plinko-multiplier.css';
+@import './features/games/originals/plinko/plinko-pin/plinko-pin.css';
 @import './features/games/originals/shared/autobet-session-status/autobet-session-status.css';
 @import './features/games/originals/shared/bet-amount-input/bet-amount-input.css';
 @import './features/games/originals/shared/game-win-modal/game-win-modal.css';

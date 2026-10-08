@@ -1,0 +1,29 @@
+@utility ds-plinko-multiplier {
+  display: flex;
+  width: var(--ds-spacing-10);
+  height: var(--ds-spacing-10);
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ds-black);
+  border-radius: var(--ds-radius-xs);
+
+  &[data-land] {
+    animation: ds-plinko-multiplier-land var(--ds-duration-slower) var(--ds-ease-standard);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &[data-land] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes ds-plinko-multiplier-land {
+  33% {
+    transform: translateY(var(--ds-spacing-1));
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}

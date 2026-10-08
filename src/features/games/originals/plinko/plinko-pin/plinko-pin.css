@@ -1,0 +1,51 @@
+@utility ds-plinko-pin {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+@utility ds-plinko-pin-core {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  border-radius: var(--ds-radius-full);
+  background-color: var(--ds-gray-850);
+}
+
+@utility ds-plinko-pin-circle {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 15px;
+  height: 15px;
+  border-radius: var(--ds-radius-full);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transform: translateX(-50%);
+
+  &[data-hit] {
+    animation: ds-plinko-pin-ping var(--ds-duration-slow) var(--ds-ease-entrance) forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &[data-hit] {
+      animation: none;
+    }
+  }
+}
+
+@keyframes ds-plinko-pin-ping {
+  0%,
+  50% {
+    filter: drop-shadow(0 0 5px var(--ds-purple-500));
+  }
+
+  100% {
+    filter: none;
+  }
+}

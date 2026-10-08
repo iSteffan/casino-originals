@@ -1,0 +1,15 @@
+@utility ds-plinko-last-results {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+}
+
+@utility ds-plinko-last-results-pill {
+  display: flex;
+  height: 20px;
+  min-width: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ds-radius-xxs);
+  padding-inline: 6px;
+}
