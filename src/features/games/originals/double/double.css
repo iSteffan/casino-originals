@@ -1,0 +1,44 @@
+/* Betstrike legacy shared-games.css: `win-animate` + `double-cell-shadow`. */
+@keyframes ds-double-tile-win {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  10% {
+    transform: scale(1.05) rotate(5deg);
+  }
+  25% {
+    transform: scale(1.05) rotate(-5deg);
+  }
+  40% {
+    transform: scale(1.05) rotate(5deg);
+  }
+  55% {
+    transform: scale(1.05) rotate(-5deg);
+  }
+  70% {
+    transform: scale(1.05) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.ds-double-tile-win {
+  filter: drop-shadow(0 4px 6px rgba(100, 40, 219, 0.8));
+  animation: ds-double-tile-win 2s 0.5s ease;
+}
+
+.ds-double-tile-win[data-reduced-motion='true'] {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-double-tile-win {
+    animation: none;
+  }
+}
+
+/* Legacy board background. */
+.ds-double-board {
+  background: radial-gradient(ellipse 92.71% 92.71% at 50% -22.5%, #000 54%, #100f13 100%);
+}
