@@ -31,6 +31,7 @@ export function DoubleBoard({
   resultAnnouncement,
   reducedMotion = false,
   theatreMode = false,
+  overlay,
   className,
 }: DoubleBoardProps) {
   const outcome = toDoubleOutcome(getDoubleTile(tileIndex));
@@ -78,6 +79,11 @@ export function DoubleBoard({
         aria-label={lastResultsAriaLabel}
         className="px-6"
       />
+
+      {overlay ? (
+        // Full-width wrapper so the modal's amount sits beside the multiplier.
+        <div className="pointer-events-none absolute inset-0 z-30">{overlay}</div>
+      ) : null}
 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {resultAnnouncement ? (

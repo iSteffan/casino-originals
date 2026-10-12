@@ -49,6 +49,12 @@ export const APP_SIDEBAR_GAMES: readonly SideMenuGameListItem[] = [
     href: '/games/plinko',
     imageSrc: '/img/games/sidebar/plinko.png',
   },
+  {
+    id: 'double',
+    label: 'Double',
+    href: '/games/double',
+    imageSrc: '/img/games/sidebar/double.png',
+  },
 ] as const;
 
 /** Maps a Storybook story id to the live app sidebar href. */

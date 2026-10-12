@@ -5,6 +5,10 @@ import type { DoubleBoardProps } from './double-board/double-board.types';
 import { DoubleConfig } from './double-config/double-config';
 import type { DoubleConfigProps } from './double-config/double-config.types';
 
+import {
+  GameWinModal,
+  type GameWinModalProps,
+} from '#ui/features/games/originals/shared/game-win-modal/game-win-modal';
 import { OriginalsGameShell } from '#ui/features/games/originals/originals-game-shell/originals-game-shell';
 import { GameHeader } from '#ui/features/games/shared/game-player/game-header/game-header';
 import { TheatreModeSync } from '#ui/layouts/app-header/app-layout-provider';
@@ -13,6 +17,7 @@ import { cn } from '#ui/lib/cn';
 export interface DoubleOriginalsViewProps {
   config: DoubleConfigProps;
   board: DoubleBoardProps;
+  winOverlay: GameWinModalProps;
   header: {
     title: string;
     volume: number;
@@ -33,6 +38,7 @@ export interface DoubleOriginalsViewProps {
 export function DoubleOriginalsView({
   config,
   board,
+  winOverlay,
   header,
   theatreMode,
   theatreModeActive,
@@ -102,6 +108,19 @@ export function DoubleOriginalsView({
                 resultAnnouncement={board.resultAnnouncement}
                 reducedMotion={board.reducedMotion}
                 theatreMode={theatreMode}
+                overlay={
+                  <GameWinModal
+                    open={winOverlay.open}
+                    title={winOverlay.title}
+                    multiplierLabel={winOverlay.multiplierLabel}
+                    multiplier={winOverlay.multiplier}
+                    formattedWinAmount={winOverlay.formattedWinAmount}
+                    currencyIcon={winOverlay.currencyIcon}
+                    volume={winOverlay.volume}
+                    reducedMotion={winOverlay.reducedMotion}
+                    contentClassName={winOverlay.contentClassName}
+                  />
+                }
               />
             }
           />

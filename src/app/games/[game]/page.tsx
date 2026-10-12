@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { BlackjackPage } from '#ui/features/games/originals/blackjack/blackjack-page';
 import { CoinflipPage } from '#ui/features/games/originals/coinflip/coinflip-page';
 import { DicePage } from '#ui/features/games/originals/dice/dice-page';
+import { DoublePage } from '#ui/features/games/originals/double/double-page';
 import { KenoPage } from '#ui/features/games/originals/keno/keno-page';
 import { MinesPage } from '#ui/features/games/originals/mines/mines-page';
 import { PlinkoPage } from '#ui/features/games/originals/plinko/plinko-page';
@@ -15,6 +16,7 @@ const GAME_PAGES = {
   blackjack: BlackjackPage,
   coinflip: CoinflipPage,
   dice: DicePage,
+  double: DoublePage,
   keno: KenoPage,
   mines: MinesPage,
   plinko: PlinkoPage,

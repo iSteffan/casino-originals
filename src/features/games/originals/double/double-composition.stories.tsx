@@ -74,6 +74,7 @@ function DoubleCompositionPlayground({
       <DoubleOriginalsView
         config={view.config}
         board={view.board}
+        winOverlay={view.winOverlay}
         header={header}
         theatreMode={view.theatreMode}
         theatreModeActive={view.theatreModeActive}

@@ -29,6 +29,8 @@ export const doubleStoryLabels = {
   previousRolls: 'Previous rolls',
   last100: 'Last 100',
   lastResults: doubleStoryLastResultsAriaLabel,
+  winTitle: 'You win',
+  winMultiplier: 'Multiplier',
 };
 
 export const doubleStoryRoundStatusLabels: DoubleRoundStatusLabels = {

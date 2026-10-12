@@ -42,11 +42,11 @@ export const DOUBLE_PAYOUT_MULTIPLIERS: Readonly<Record<DoubleBetType, number>> 
 
 /**
  * Offline round timings. Betstrike drives phases from the server (`double:game-phase`);
- * these mirror the legacy client: ~10 s betting countdown, ~1 s lock (legacy rolls for
- * `betsLockedAt + 11 s`), a 10 s strip roll and a 3 s win highlight.
+ * these mirror the legacy client (~1 s lock, legacy rolls for `betsLockedAt + 11 s`, a 10 s
+ * strip roll and a 3 s win highlight) with a shorter 5 s betting countdown (product request).
  */
 export const DOUBLE_PHASE_DURATION_MS: Readonly<Record<DoublePhase, number>> = {
-  BETTING: 10_000,
+  BETTING: 5_000,
   LOCKED: 1_000,
   RESOLVING: 10_000,
   FINISHED: 3_000,

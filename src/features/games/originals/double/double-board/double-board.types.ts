@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import type { DoubleLastResultsLabels } from '#ui/features/games/originals/double/double-last-results/double-last-results.types';
 import type { DoubleRoundStatusLabels } from '#ui/features/games/originals/double/double-round-status/double-round-status.types';
 import type {
@@ -24,5 +26,7 @@ export interface DoubleBoardProps {
   resultAnnouncement?: DoubleResultAnnouncement;
   reducedMotion?: boolean;
   theatreMode?: boolean;
+  /** Full-board overlay slot (shared GameWinModal), centered over the strip. */
+  overlay?: ReactNode;
   className?: string;
 }

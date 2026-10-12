@@ -17,20 +17,27 @@ import {
 } from '#ui/features/games/originals/core/originals-autobet';
 import { resolveOriginalsAutobetAction } from '#ui/features/games/originals/originals-config/originals-config-autobet.utils';
 import { useBetAmountDisplay } from '#ui/features/wallet/use-bet-amount-display';
-import { getFiatStakeUsd, SINGLE_BET_THRESHOLD_USD } from '#ui/features/wallet/wallet-balances';
+import type { GameWinModalProps } from '#ui/features/games/originals/shared/game-win-modal/game-win-modal.types';
+import {
+  formatWalletAmount,
+  formatWalletAmountLabel,
+  getFiatStakeUsd,
+  SINGLE_BET_THRESHOLD_USD,
+} from '#ui/features/wallet/wallet-balances';
 import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
+import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 import { Image } from '#ui/primitives/data-display/image/image';
 
-function CurrencyIcon({ src }: { src: string }) {
+function CurrencyIcon({ src, size }: { src: string; size: 20 | 32 }) {
   return (
     <Image
       src={src}
       alt=""
-      width={20}
-      height={20}
-      wrapperClassName="size-5 shrink-0 rounded-ds-full"
-      className="size-5 object-contain"
+      width={size}
+      height={size}
+      wrapperClassName={cn('shrink-0 rounded-ds-full', size === 20 ? 'size-5' : 'size-8')}
+      className={cn(size === 20 ? 'size-5' : 'size-8', 'object-contain')}
       showSkeleton={false}
     />
   );
@@ -107,7 +114,7 @@ export function useDoubleOriginalsController(session: DoubleSession): DoubleOrig
       onChange: amountDisplay.onDisplayChange,
       conversionText: amountDisplay.conversionText,
       tooltip: doubleStoryBetAmountTooltip,
-      currencyIcon: <CurrencyIcon src={wallet.currentBalance.icon} />,
+      currencyIcon: <CurrencyIcon src={wallet.currentBalance.icon} size={20} />,
       precision: amountDisplay.precision,
       error: exceedsWallet && !autoBetActive ? 'Amount exceeds balance' : undefined,
       thresholdWarning: showThresholdWarning
@@ -154,9 +161,27 @@ export function useDoubleOriginalsController(session: DoubleSession): DoubleOrig
     theatreMode: theatreLayoutActive,
   };
 
+  // Win modal content: total payout and payout / total stake (two picks may both pay).
+  const winCurrencyId = session.win.currencyId ?? wallet.currencyId;
+  const winCurrencyIcon =
+    wallet.items.find((item) => item.balance.id === winCurrencyId)?.balance.icon ??
+    wallet.currentBalance.icon;
+  const winOverlay: GameWinModalProps = {
+    open: session.win.open,
+    title: doubleStoryLabels.winTitle,
+    multiplierLabel: doubleStoryLabels.winMultiplier,
+    multiplier: `x${session.win.multiplier.toFixed(2)}`,
+    formattedWinAmount: formatWalletAmountLabel(
+      formatWalletAmount(session.win.payoutAmount, winCurrencyId, wallet.displayFiat),
+    ),
+    currencyIcon: <CurrencyIcon src={winCurrencyIcon} size={32} />,
+    reducedMotion,
+  };
+
   return {
     config,
     board,
+    winOverlay,
     header: {
       title: doubleStoryLabels.title,
       volume: session.volume,

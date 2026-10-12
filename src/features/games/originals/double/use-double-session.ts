@@ -82,10 +82,28 @@ interface DoubleSessionState {
   /** Newest first, capped at the last-100 stats window. */
   history: DoubleHistoryItem[];
   resultAnnouncement?: DoubleResultAnnouncement;
+  /** Shared GameWinModal payload; open from FINISHED until the next betting window. */
+  win: DoubleWinState;
   auto: OriginalAutobetStatus;
   metrics: OriginalAutobetMetrics;
   initialBet: string;
 }
+
+export interface DoubleWinState {
+  open: boolean;
+  /** Total payout of the winning picks (crypto units of `currencyId`). */
+  payoutAmount: string;
+  /** Effective multiplier: total payout / total stake of the round. */
+  multiplier: number;
+  currencyId: CashierCurrencyId | null;
+}
+
+const CLOSED_DOUBLE_WIN: DoubleWinState = {
+  open: false,
+  payoutAmount: '0',
+  multiplier: 0,
+  currencyId: null,
+};
 
 export interface UseDoubleSessionOptions {
   initialMode?: OriginalsConfigMode;
@@ -145,6 +163,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     betCurrencyId: null,
     betsFromAutobet: false,
     history: [],
+    win: CLOSED_DOUBLE_WIN,
     auto: { kind: 'idle' },
     metrics: { ...EMPTY_ORIGINAL_AUTOBET_METRICS },
     initialBet: '0',
@@ -251,11 +270,23 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     let metrics = current.metrics;
     let auto = current.auto;
     let won = false;
+    let win = current.win;
 
     if (current.bets.length > 0 && current.betCurrencyId) {
       const settlement = settleDoubleBets(current.bets, outcome);
       won = settlement.win;
-      if (settlement.win) creditPayout(current.betCurrencyId, settlement.payoutAmount);
+      if (settlement.win) {
+        creditPayout(current.betCurrencyId, settlement.payoutAmount);
+        const stake = new BigNumber(settlement.betAmount);
+        win = {
+          open: true,
+          payoutAmount: settlement.payoutAmount,
+          multiplier: stake.gt(0)
+            ? new BigNumber(settlement.payoutAmount).div(stake).toNumber()
+            : 0,
+          currencyId: current.betCurrencyId,
+        };
+      }
       message += settlement.win ? ' You won.' : ' You lost.';
 
       if (current.betsFromAutobet) {
@@ -291,6 +322,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
       round: { ...round, phase: 'FINISHED', phaseEndsAt: now + DOUBLE_PHASE_DURATION_MS.FINISHED },
       history: [historyItem, ...current.history].slice(0, DOUBLE_STATS_WINDOW),
       resultAnnouncement: { id: historyItem.id, message },
+      win,
       metrics,
       auto,
     });
@@ -344,6 +376,8 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
           bets: [],
           betCurrencyId: null,
           betsFromAutobet: false,
+          // Modal hides when the next betting window opens (keeps the payload for the fade-out).
+          win: { ...current.win, open: false },
         });
         placeAutoBet();
         return;
