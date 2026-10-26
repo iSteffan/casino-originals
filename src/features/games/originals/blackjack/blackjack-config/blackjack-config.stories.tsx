@@ -88,7 +88,19 @@ function BlackjackConfigPlayground(args: PlaygroundArgs) {
   return (
     <div className="flex w-full max-w-5xl flex-col gap-4">
       <div className="w-full max-w-sm">
-        <BlackjackConfig {...props} />
+        <BlackjackConfig
+          amount={props.amount}
+          onAmountChange={props.onAmountChange}
+          amountLabel={props.amountLabel}
+          currencyIcon={props.currencyIcon}
+          amountQuickActions={props.amountQuickActions}
+          startLabel={props.startLabel}
+          onStart={props.onStart}
+          startDisabled={props.startDisabled}
+          playing={props.playing}
+          insurance={props.insurance}
+          actions={props.actions}
+        />
       </div>
       {/* Horizontal scenarios under the config panel (mirrors Composition placement). */}
       <BlackjackConfigExamples

@@ -164,6 +164,13 @@ export function useRouletteOriginalsController(
         session.setHighlightedNumbers([...numbers]);
       },
     },
+    resultAnnouncement:
+      state.result !== null
+        ? {
+            id: `roulette-round-${state.round}`,
+            message: `Roulette rolled ${state.result}${state.settlement && state.settlement.payout > 0 ? `, payout ${state.winAmount}` : ''}`,
+          }
+        : undefined,
   };
 
   const winOverlay: GameWinModalProps = {

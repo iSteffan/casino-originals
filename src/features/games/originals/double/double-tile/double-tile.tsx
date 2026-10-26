@@ -31,7 +31,7 @@ export function DoubleTile({
         aria-hidden
         className={cn(
           'pointer-events-none absolute inset-0 blur-[20px] transition-all duration-300',
-          state === 'dimmed' ? 'bg-black opacity-80' : 'bg-transparent opacity-100',
+          state === 'dimmed' ? 'bg-ds-black opacity-80' : 'bg-transparent opacity-100',
         )}
       />
     </div>

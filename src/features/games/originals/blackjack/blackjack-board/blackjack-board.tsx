@@ -192,10 +192,38 @@ function BlackjackBoardInner({
   );
 }
 
-export function BlackjackBoard(props: BlackjackBoardProps) {
+export function BlackjackBoard({
+  dealer,
+  dealerLabel,
+  hands,
+  announcement,
+  announcementId,
+  emptyLabel,
+  demoNotice,
+  tableLabel,
+  backgroundSrc,
+  theatreMode,
+  className,
+  overlay,
+  animate,
+}: BlackjackBoardProps) {
   return (
-    <BlackjackDeckOriginProvider hands={props.hands}>
-      <BlackjackBoardInner {...props} />
+    <BlackjackDeckOriginProvider hands={hands}>
+      <BlackjackBoardInner
+        dealer={dealer}
+        dealerLabel={dealerLabel}
+        hands={hands}
+        announcement={announcement}
+        announcementId={announcementId}
+        emptyLabel={emptyLabel}
+        demoNotice={demoNotice}
+        tableLabel={tableLabel}
+        backgroundSrc={backgroundSrc}
+        theatreMode={theatreMode}
+        className={className}
+        overlay={overlay}
+        animate={animate}
+      />
     </BlackjackDeckOriginProvider>
   );
 }

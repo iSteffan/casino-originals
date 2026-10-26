@@ -4,10 +4,16 @@ import type { RouletteFieldProps } from '../roulette-field/roulette-field.types'
 import type { RouletteLastResultsProps } from '../roulette-last-results/roulette-last-results.types';
 import type { RouletteWheelProps } from '../roulette-wheel/roulette-wheel.types';
 
+export interface RouletteResultAnnouncement {
+  id: string;
+  message: string;
+}
+
 export interface RouletteBoardProps {
   lastResults: RouletteLastResultsProps;
   wheel: RouletteWheelProps;
   field: RouletteFieldProps;
+  resultAnnouncement?: RouletteResultAnnouncement;
   /** When true, board fills the theatre column height like peer originals. */
   theatreMode?: boolean;
   overlay?: ReactNode;
