@@ -6,6 +6,9 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
+    },
     rules: {
       // Disabled: All errors are valid React patterns in game engines (setState in useEffect for data fetching, cleanup, round settle, etc.)
       "react-hooks/set-state-in-effect": "off",

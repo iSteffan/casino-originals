@@ -1,13 +1,22 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-import type { AutobetSessionStatusProps } from '#ui/features/games/originals/shared/autobet-session-status/autobet-session-status.types';
+import type {
+  AutobetSessionState,
+  AutobetSessionStatusLabels,
+} from '#ui/features/games/originals/shared/autobet-session-status/autobet-session-status.types';
 
 type OriginalsConfigMode = 'manual' | 'auto';
 
 /** Primary auto action appearance: start (brand), stop/retry (destructive). */
 type OriginalsConfigAutoActionVariant = 'start' | 'stop' | 'retry';
 
-type OriginalsConfigAutobetSessionProps = Omit<AutobetSessionStatusProps, 'className'>;
+interface OriginalsConfigAutobetSessionProps {
+  state: AutobetSessionState;
+  totalWagered: string;
+  netProfit: string;
+  winRate: string;
+  labels?: Partial<AutobetSessionStatusLabels>;
+}
 
 interface OriginalsConfigProps {
   mode: OriginalsConfigMode;

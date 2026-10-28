@@ -5,9 +5,16 @@ import type { TowersConfigProps } from './towers-config.types';
 import { OriginalsGameConfig } from '#ui/features/games/originals/originals-config/originals-game-config';
 import { TowersDifficulty } from '#ui/features/games/originals/towers/towers-difficulty/towers-difficulty';
 
-export function TowersConfig(props: TowersConfigProps) {
-  const { shell, betAmount, rounds, stopConditions, fieldsDisabled = false } = props;
-  const { clearSelection, random } = props.actions;
+export function TowersConfig({
+  shell,
+  betAmount,
+  rounds,
+  stopConditions,
+  fieldsDisabled = false,
+  actions,
+  difficulty,
+}: TowersConfigProps) {
+  const { clearSelection, random } = actions;
   const shellWithGameActions = {
     ...shell,
     autoSecondaryActionLabel: clearSelection.label,
@@ -28,10 +35,10 @@ export function TowersConfig(props: TowersConfigProps) {
       fieldsDisabled={fieldsDisabled}
     >
       <TowersDifficulty
-        value={props.difficulty.value}
-        onChange={props.difficulty.onChange}
-        options={props.difficulty.options}
-        labels={props.difficulty.labels}
+        value={difficulty.value}
+        onChange={difficulty.onChange}
+        options={difficulty.options}
+        labels={difficulty.labels}
         disabled={fieldsDisabled}
       />
     </OriginalsGameConfig>
