@@ -52,6 +52,8 @@ import {
 } from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
 import { shouldReduceMotion } from '#ui/lib/motion';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
+import { sendDiceBetCommand } from '#ui/features/games/originals/dice/dice-socket';
 
 const AUTOBET_CONTINUE_DELAY_MS = 300;
 const WIN_MODAL_MANUAL_HIDE_MS = 2000;
@@ -69,6 +71,7 @@ interface PendingRoll {
   direction: DiceControlsDirection;
   betAmount: string;
   multiplier: number;
+  serverPayoutAmount?: string;
   auto: boolean;
 }
 
@@ -95,6 +98,7 @@ interface DiceSessionState {
   markerValue: number | null;
   markerState: DiceCubeMarkerState;
   isAnimating: boolean;
+  isPendingBet: boolean;
   animationDirection: DiceCubeAnimationDirection;
   lastResults: DiceLastResultItem[];
   resultAnnouncement?: DiceBoardProps['resultAnnouncement'];
@@ -123,6 +127,8 @@ function rollDiceValue(): number {
 
 export function useDiceSession() {
   const wallet = useWallet();
+  const { socket, connected, status: socketStatus } = useGameSocket();
+  const cancelBetCommandRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<DiceSessionState>(() => ({
     mode: 'manual',
     betAmount: '0',
@@ -145,6 +151,7 @@ export function useDiceSession() {
     markerValue: INITIAL_LINKED.displayValue,
     markerState: 'play',
     isAnimating: false,
+    isPendingBet: false,
     animationDirection: 'right',
     lastResults: [],
     showWinModal: false,
@@ -163,6 +170,13 @@ export function useDiceSession() {
   stateRef.current = state;
   volumeRef.current = state.volume;
 
+  const clearSettleTimeout = () => {
+    if (settleTimeoutRef.current !== null) {
+      clearTimeout(settleTimeoutRef.current);
+      settleTimeoutRef.current = null;
+    }
+  };
+
   const playSound = (name: DiceStorySoundName) => {
     const audio = playDiceStorySound(name, volumeRef.current, (settled) => {
       activeSoundsRef.current.delete(settled);
@@ -172,7 +186,11 @@ export function useDiceSession() {
 
   useEffect(() => {
     preloadDiceStorySounds();
-    return () => stopDiceStorySounds(activeSoundsRef.current);
+    return () => {
+      stopDiceStorySounds(activeSoundsRef.current);
+      clearSettleTimeout();
+      cancelBetCommandRef.current?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -187,16 +205,10 @@ export function useDiceSession() {
     });
   };
 
-  const clearSettleTimeout = () => {
-    if (settleTimeoutRef.current !== null) {
-      clearTimeout(settleTimeoutRef.current);
-      settleTimeoutRef.current = null;
-    }
-  };
 
   const applyAutobetEdit = (patch: Partial<DiceSessionState> = {}) => {
     const current = stateRef.current;
-    if (current.isAnimating || isAutobetActive(current.auto)) return;
+    if (current.isAnimating || current.isPendingBet || isAutobetActive(current.auto)) return;
     const edited = prepareAutobetEdit(current);
     const next = { ...current, ...edited, ...patch };
     stateRef.current = next;
@@ -210,7 +222,7 @@ export function useDiceSession() {
     multiplier: number;
   }) => {
     const current = stateRef.current;
-    if (current.isAnimating || isAutobetActive(current.auto)) return;
+    if (current.isAnimating || current.isPendingBet || isAutobetActive(current.auto)) return;
 
     const changed =
       (linked.direction !== undefined && linked.direction !== current.direction) ||
@@ -238,11 +250,11 @@ export function useDiceSession() {
       return;
     }
 
-    const { rolledValue, threshold, direction, betAmount, multiplier, auto } =
+    const { rolledValue, threshold, direction, betAmount, multiplier, serverPayoutAmount, auto } =
       pending;
     const isWin = isDiceStoryWin(rolledValue, threshold, direction);
     const bet = new BigNumber(betAmount);
-    const payoutAmount = isWin ? bet.times(multiplier).toFixed() : '0';
+    const payoutAmount = serverPayoutAmount !== undefined ? serverPayoutAmount : (isWin ? bet.times(multiplier).toFixed() : '0');
 
     const applied = wallet.applyRound({ betAmount, payoutAmount });
     if (!applied) {
@@ -315,15 +327,16 @@ export function useDiceSession() {
     });
   });
 
-  const startRoll = (betAmount: string, auto: boolean) => {
+  const executeRollAnimation = (
+    rolledValue: number,
+    threshold: number,
+    direction: DiceControlsDirection,
+    betAmount: string,
+    multiplier: number,
+    auto: boolean,
+    serverPayoutAmount?: string,
+  ) => {
     const current = stateRef.current;
-    if (current.isAnimating) return false;
-    if (!wallet.canAfford(betAmount)) return false;
-
-    clearSettleTimeout();
-
-    const rolledValue = rollDiceValue();
-    const threshold = current.displayValue;
     const prev = current.markerValue ?? threshold;
     const animationDirection: DiceCubeAnimationDirection =
       rolledValue > prev ? 'right' : 'left';
@@ -331,9 +344,10 @@ export function useDiceSession() {
     pendingRollRef.current = {
       rolledValue,
       threshold,
-      direction: current.direction,
+      direction,
       betAmount,
-      multiplier: current.multiplier,
+      multiplier,
+      serverPayoutAmount,
       auto,
     };
 
@@ -350,7 +364,7 @@ export function useDiceSession() {
         showWinModal: false,
       });
       settleRoll();
-      return true;
+      return;
     }
 
     patchState({
@@ -366,6 +380,78 @@ export function useDiceSession() {
     settleTimeoutRef.current = setTimeout(
       settleRoll,
       DICE_CUBE_ANIMATION_DURATION_MS,
+    );
+  };
+
+  const startRoll = (betAmount: string, auto: boolean) => {
+    const current = stateRef.current;
+    if (current.isAnimating || current.isPendingBet) return false;
+    if (!wallet.canAfford(betAmount)) return false;
+
+    clearSettleTimeout();
+    cancelBetCommandRef.current?.();
+
+    const threshold = current.displayValue;
+    const direction = current.direction;
+    const multiplier = current.multiplier;
+
+    if (connected && socket) {
+      // Mark as pending bet without triggering premature cube animation
+      patchState({
+        isPendingBet: true,
+        resultAnnouncement: undefined,
+        showWinModal: false,
+      });
+
+      cancelBetCommandRef.current = sendDiceBetCommand(
+        socket,
+        {
+          target: threshold,
+          direction,
+          amount: betAmount,
+          currencyId: wallet.currencyId,
+        },
+        {
+          onResult: (result) => {
+            cancelBetCommandRef.current = null;
+            patchState({ isPendingBet: false });
+            executeRollAnimation(
+              result.rollResult,
+              result.target,
+              result.direction,
+              result.betAmount,
+              result.payoutMultiplier,
+              auto,
+              result.payoutAmount,
+            );
+          },
+          onError: (errMsg) => {
+            console.warn('[Dice WS Error]', errMsg, 'Falling back to local roll.');
+            cancelBetCommandRef.current = null;
+            patchState({ isPendingBet: false });
+            const rolledValue = rollDiceValue();
+            executeRollAnimation(
+              rolledValue,
+              threshold,
+              direction,
+              betAmount,
+              multiplier,
+              auto,
+            );
+          },
+        },
+      );
+      return true;
+    }
+
+    const rolledValue = rollDiceValue();
+    executeRollAnimation(
+      rolledValue,
+      threshold,
+      direction,
+      betAmount,
+      multiplier,
+      auto,
     );
     return true;
   };
@@ -500,7 +586,7 @@ export function useDiceSession() {
 
   const setRounds = (rounds: string) => {
     const current = stateRef.current;
-    if (current.isAnimating || isAutobetActive(current.auto)) return;
+    if (current.isAnimating || current.isPendingBet || isAutobetActive(current.auto)) return;
     const edited = prepareAutobetEdit(current);
     if (rounds === edited.rounds && edited.auto.kind === current.auto.kind) {
       return;
@@ -594,7 +680,9 @@ export function useDiceSession() {
     ...state,
     wallet,
     rtpValue,
-    fieldsDisabled: state.isAnimating || isAutobetActive(state.auto),
+    socketStatus,
+    isSocketConnected: connected,
+    fieldsDisabled: state.isAnimating || state.isPendingBet || isAutobetActive(state.auto),
     placeManualBet,
     handleAutoAction,
     setMode,

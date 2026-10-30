@@ -9,6 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "screenshots": "node scripts/capture-screenshots.mjs",
+    "server": "node --import tsx server/index.ts",
+    "ws": "node --import tsx server/index.ts",
+    "socket": "node --import tsx server/index.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -31,6 +34,8 @@
     "next-intl": "^4.8.2",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4",
     "tailwind-merge": "^3.0.2",
     "tailwindcss-animate": "^1.0.7",
     "use-haptic": "^1.1.11",
@@ -50,6 +55,7 @@
     "storybook": "^10.4.4",
     "storybook-addon-pseudo-states": "10.4.4",
     "tailwindcss": "^4.0.12",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vite": "^6.0.0",
     "vite-plugin-svgr": "^5.2.0"

@@ -20,7 +20,7 @@ export function getDiceCubeMarkerTransform(markerValue: number): string {
   const position = Number.isFinite(markerValue) ? markerValue : 50;
   const clamped = Math.min(100, Math.max(0, position));
 
-  return `translateX(${clamped}%)`;
+  return `translateX(clamp(30px, ${clamped}%, calc(100% - 30px)))`;
 }
 
 export function getDiceCubeMarkerAnimationClass(

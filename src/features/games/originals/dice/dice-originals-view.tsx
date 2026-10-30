@@ -24,6 +24,7 @@ export interface DiceOriginalsViewProps {
     onVolumeChange: (volume: number) => void;
     onTheatreToggle: () => void;
     onBackClick: () => void;
+    modeControl?: React.ReactNode;
   };
   theatreMode: boolean;
   theatreModeActive: boolean;
@@ -80,6 +81,7 @@ export function DiceOriginalsView({
             onVolumeChange={header.onVolumeChange}
             isTheatreMode={header.isTheatreMode}
             onTheatreToggle={header.onTheatreToggle}
+            modeControl={header.modeControl}
             className="pr-[4.5rem]"
             actionsClassName="absolute top-0 right-0 z-10 md:min-h-ds-14"
           />

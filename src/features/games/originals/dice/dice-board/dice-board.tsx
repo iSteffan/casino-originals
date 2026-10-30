@@ -39,7 +39,7 @@ export function DiceBoard({
   return (
     <div
       className={cn(
-        'dice-board-shell rounded-ds-sm relative flex w-full min-w-0 flex-col pt-3',
+        'dice-board-shell rounded-ds-sm relative flex w-full min-w-0 flex-col pt-3 overflow-visible',
         theatreMode && 'lg:h-full lg:min-h-0 lg:pt-4',
         className,
       )}
@@ -114,7 +114,7 @@ export function DiceBoard({
           className={cn(
             'bg-ds-black relative mx-auto overflow-visible',
             theatreMode
-              ? 'lg:max-w-[min(90vw,900px)]'
+              ? 'max-w-[400px] sm:max-w-[500px] lg:max-w-[min(90vw,900px)]'
               : 'max-w-[400px] sm:max-w-[500px] lg:max-w-[600px]',
           )}
         >
