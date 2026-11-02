@@ -284,7 +284,7 @@ export function useMinesSession() {
           metrics,
           stopConditions: getStopConditions(latest),
         },
-        "1",
+        getCryptoStakeFloorRate(wallet.currencyId),
       );
 
       if (latest.auto.kind === "stopping") {
@@ -480,7 +480,7 @@ export function useMinesSession() {
     if (
       !canContinueAutobet(
         { rounds: current.rounds, metrics: current.metrics, stopConditions },
-        "1",
+        getCryptoStakeFloorRate(wallet.currencyId),
       )
     ) {
       patchState({ auto: { kind: "idle" } });
@@ -662,7 +662,7 @@ export function useMinesSession() {
           metrics: current.metrics,
           stopConditions: getStopConditions(current),
         },
-        "1",
+        getCryptoStakeFloorRate(wallet.currencyId),
       )
     ) {
       const idle = { ...current, auto: { kind: "idle" as const } };

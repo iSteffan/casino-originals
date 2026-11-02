@@ -300,7 +300,7 @@ export function useDiceSession() {
           metrics,
           stopConditions: getStopConditions(current),
         },
-        '1',
+        getCryptoStakeFloorRate(wallet.currencyId),
       );
 
       if (current.auto.kind === 'stopping') {
@@ -463,7 +463,7 @@ export function useDiceSession() {
     if (
       !canContinueAutobet(
         { rounds: current.rounds, metrics: current.metrics, stopConditions },
-        '1',
+        getCryptoStakeFloorRate(wallet.currencyId),
       )
     ) {
       patchState({ auto: { kind: 'idle' } });
@@ -535,7 +535,7 @@ export function useDiceSession() {
           metrics: current.metrics,
           stopConditions: getStopConditions(current),
         },
-        '1',
+        getCryptoStakeFloorRate(wallet.currencyId),
       )
     ) {
       const idle = { ...current, auto: { kind: 'idle' as const } };

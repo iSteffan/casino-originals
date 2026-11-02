@@ -286,7 +286,7 @@ export function useTowersSession() {
           metrics,
           stopConditions: getStopConditions(latest),
         },
-        "1",
+        getCryptoStakeFloorRate(wallet.currencyId),
       );
 
       if (latest.auto.kind === "stopping") {
@@ -482,7 +482,7 @@ export function useTowersSession() {
     if (
       !canContinueAutobet(
         { rounds: current.rounds, metrics: current.metrics, stopConditions },
-        "1",
+        getCryptoStakeFloorRate(wallet.currencyId),
       )
     ) {
       patchState({ auto: { kind: "idle" } });
@@ -625,7 +625,7 @@ export function useTowersSession() {
           metrics: current.metrics,
           stopConditions: getStopConditions(current),
         },
-        "1",
+        getCryptoStakeFloorRate(wallet.currencyId),
       )
     ) {
       const idle = { ...current, auto: { kind: "idle" as const } };
