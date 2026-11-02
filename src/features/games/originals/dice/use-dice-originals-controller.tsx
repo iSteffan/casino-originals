@@ -34,6 +34,7 @@ import { useBetAmountDisplay } from '#ui/features/wallet/use-bet-amount-display'
 import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 import type { DiceOriginalsViewProps } from './dice-originals-view';
 
@@ -68,48 +69,7 @@ function mapAutobetSessionState(
   return 'ready-to-start';
 }
 
-function SocketStatusBadge({
-  status,
-}: {
-  status: 'connecting' | 'connected' | 'disconnected';
-}) {
-  const isConnected = status === 'connected';
-  const isConnecting = status === 'connecting';
 
-  return (
-    <div
-      className={cn(
-        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-ds-full text-xs font-semibold tracking-wide border transition-all',
-        isConnected
-          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-          : isConnecting
-            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
-            : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/60',
-      )}
-      title={
-        isConnected
-          ? 'Connected to WebSocket Server (RNG on server)'
-          : isConnecting
-            ? 'Connecting to WebSocket Server...'
-            : 'Offline / Local RNG fallback'
-      }
-    >
-      <span
-        className={cn(
-          'size-2 rounded-full',
-          isConnected
-            ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
-            : isConnecting
-              ? 'bg-amber-400'
-              : 'bg-zinc-500',
-        )}
-      />
-      <span>
-        {isConnected ? 'WS Live' : isConnecting ? 'Connecting...' : 'Offline RNG'}
-      </span>
-    </div>
-  );
-}
 
 export function useDiceOriginalsController(
   session: DiceSession,

@@ -45,6 +45,13 @@ import {
 } from "#ui/features/wallet/wallet-balances";
 import { useWallet } from "#ui/features/wallet/wallet-provider";
 import { shouldReduceMotion } from "#ui/lib/motion";
+import { useGameSocket } from "#ui/features/games/shared/socket/game-socket";
+import {
+  sendMinesStartCommand,
+  sendMinesRevealCommand,
+  sendMinesCashoutCommand,
+  sendMinesAutobetCommand,
+} from "#ui/features/games/originals/mines/mines-socket";
 
 const AUTOBET_CONTINUE_DELAY_MS =
   MINES_STORY_BOARD_CLEAR_DELAY_MS + MINES_STORY_AUTOBET_NEXT_ROUND_DELAY_MS;
@@ -68,6 +75,7 @@ interface MinesSessionState {
   mineIndexes: number[];
   selectedIndexes: number[];
   isRoundPlaying: boolean;
+  isPendingBet: boolean;
   resultAnnouncement?: { id: string; message: string };
   showWinModal: boolean;
   winMultiplier: string;
@@ -90,6 +98,8 @@ function getStopConditions(state: MinesSessionState): OriginalStopConditions {
 
 export function useMinesSession() {
   const wallet = useWallet();
+  const { socket, connected, status: socketStatus } = useGameSocket();
+  const cancelSocketRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<MinesSessionState>(() => ({
     mode: "manual",
     betAmount: "0",
@@ -108,6 +118,7 @@ export function useMinesSession() {
     mineIndexes: [],
     selectedIndexes: [],
     isRoundPlaying: false,
+    isPendingBet: false,
     showWinModal: false,
     winMultiplier: "x0.00",
     winAmount: "0.00",
@@ -199,6 +210,7 @@ export function useMinesSession() {
     preloadMinesStorySounds();
     const activeSounds = activeSoundsRef.current;
     return () => {
+      cancelSocketRef.current?.();
       clearBoardClearTimer();
       clearAutobetTimers();
       stopMinesStorySounds(activeSounds);
@@ -250,6 +262,7 @@ export function useMinesSession() {
       patchState({
         cells,
         isRoundPlaying: false,
+        isPendingBet: false,
         showWinModal: false,
         resultAnnouncement: createMinesStoryAnnouncement(announcement),
         auto: auto
@@ -297,6 +310,7 @@ export function useMinesSession() {
     patchState({
       cells,
       isRoundPlaying: false,
+      isPendingBet: false,
       showWinModal: isWin,
       winMultiplier: `x${multiplier.toFixed(2)}`,
       winAmount: formatWinAmount(payoutAmount),
@@ -310,12 +324,64 @@ export function useMinesSession() {
 
   const startManualRound = () => {
     const current = stateRef.current;
-    if (current.isRoundPlaying || current.mode !== "manual") return false;
+    if (current.isRoundPlaying || current.isPendingBet || current.mode !== "manual") return false;
     if (!new BigNumber(current.betAmount).gt(0)) return false;
     if (!wallet.canAfford(current.betAmount)) return false;
 
     clearBoardClearTimer();
     stopMinesStorySounds(activeSoundsRef.current);
+
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      patchState({ isPendingBet: true });
+
+      cancelSocketRef.current = sendMinesStartCommand(
+        socket,
+        {
+          amount: current.betAmount,
+          currencyId: wallet.currencyId,
+          numberOfMines: current.numberOfMines,
+          gridSize: current.gridSize,
+        },
+        {
+          onResult: () => {
+            cancelSocketRef.current = null;
+            patchState({
+              cells: createMinesGridCells(current.gridSize),
+              mineIndexes: [],
+              selectedIndexes: [],
+              isRoundPlaying: true,
+              isPendingBet: false,
+              showWinModal: false,
+              resultAnnouncement: createMinesStoryAnnouncement(
+                "Round started. Pick a safe tile.",
+              ),
+            });
+          },
+          onError: (errorMessage) => {
+            console.warn("[Mines] Socket start failed, fallback to local:", errorMessage);
+            cancelSocketRef.current = null;
+            const mineIndexes = createRandomMinesMineIndexes(
+              current.gridSize,
+              current.numberOfMines,
+            );
+            patchState({
+              cells: createMinesGridCells(current.gridSize),
+              mineIndexes,
+              selectedIndexes: [],
+              isRoundPlaying: true,
+              isPendingBet: false,
+              showWinModal: false,
+              resultAnnouncement: createMinesStoryAnnouncement(
+                "Round started. Pick a safe tile.",
+              ),
+            });
+          },
+        },
+      );
+      return true;
+    }
+
     const mineIndexes = createRandomMinesMineIndexes(
       current.gridSize,
       current.numberOfMines,
@@ -326,6 +392,7 @@ export function useMinesSession() {
       mineIndexes,
       selectedIndexes: [],
       isRoundPlaying: true,
+      isPendingBet: false,
       showWinModal: false,
       resultAnnouncement: createMinesStoryAnnouncement(
         "Round started. Pick a safe tile.",
@@ -336,12 +403,46 @@ export function useMinesSession() {
 
   const cashout = () => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying || current.mode !== "manual") return;
+    if (!current.isRoundPlaying || current.isPendingBet || current.mode !== "manual") return;
     const revealedSafe = countMinesStorySafeRevealed(
       current.cells,
       current.mineIndexes,
     );
     if (revealedSafe <= 0) return;
+
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      patchState({ isPendingBet: true });
+
+      cancelSocketRef.current = sendMinesCashoutCommand(
+        socket,
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            const latest = stateRef.current;
+            playSound("cashout");
+            settleFinishedRound({
+              betAmount: latest.betAmount,
+              payoutAmount: result.payoutAmount,
+              multiplier: result.payoutMultiplier,
+              isWin: true,
+              auto: false,
+              cells: revealMinesStoryBoard({
+                cells: latest.cells,
+                mineIndexes: result.mineIndexes,
+              }),
+              announcement: "Cashed out.",
+            });
+          },
+          onError: (errorMessage) => {
+            console.error("[Mines] Cashout error:", errorMessage);
+            cancelSocketRef.current = null;
+            patchState({ isPendingBet: false });
+          },
+        },
+      );
+      return;
+    }
 
     const multiplier = getMinesStoryMultiplier(
       current.gridSize,
@@ -369,9 +470,101 @@ export function useMinesSession() {
 
   const revealManualCell = (index: number) => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying || current.mode !== "manual") return;
+    if (!current.isRoundPlaying || current.isPendingBet || current.mode !== "manual") return;
     const cell = current.cells[index];
     if (!cell || cell.revealed || cell.disabled) return;
+
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      patchState({ isPendingBet: true });
+
+      cancelSocketRef.current = sendMinesRevealCommand(
+        socket,
+        { index },
+        {
+          onStep: (result) => {
+            cancelSocketRef.current = null;
+            const latest = stateRef.current;
+            const nextCells = latest.cells.map((entry, cellIndex) =>
+              cellIndex === index
+                ? {
+                    revealed: true,
+                    content: "safe" as const,
+                    revealStyle: "player" as const,
+                    selected: false,
+                    cashoutLabel: formatCellCashoutLabel(
+                      latest.betAmount,
+                      result.payoutMultiplier,
+                    ),
+                    disabled: false,
+                  }
+                : entry,
+            );
+            playSound("cell");
+            patchState({
+              cells: nextCells,
+              isPendingBet: false,
+              resultAnnouncement: createMinesStoryAnnouncement("Safe tile revealed."),
+            });
+          },
+          onEnd: (result) => {
+            cancelSocketRef.current = null;
+            const latest = stateRef.current;
+            if (result.isMine) {
+              playSound("mine");
+              settleFinishedRound({
+                betAmount: latest.betAmount,
+                payoutAmount: "0",
+                multiplier: 0,
+                isWin: false,
+                auto: false,
+                cells: revealMinesStoryBoard({
+                  cells: latest.cells,
+                  mineIndexes: result.mineIndexes,
+                  hitIndex: index,
+                }),
+                announcement: "Mine hit. Round lost.",
+              });
+            } else {
+              const nextCells = latest.cells.map((entry, cellIndex) =>
+                cellIndex === index
+                  ? {
+                      revealed: true,
+                      content: "safe" as const,
+                      revealStyle: "player" as const,
+                      selected: false,
+                      cashoutLabel: formatCellCashoutLabel(
+                        latest.betAmount,
+                        result.payoutMultiplier,
+                      ),
+                      disabled: false,
+                    }
+                  : entry,
+              );
+              playSound("cashout");
+              settleFinishedRound({
+                betAmount: latest.betAmount,
+                payoutAmount: result.payoutAmount,
+                multiplier: result.payoutMultiplier,
+                isWin: true,
+                auto: false,
+                cells: revealMinesStoryBoard({
+                  cells: nextCells,
+                  mineIndexes: result.mineIndexes,
+                }),
+                announcement: "All safe tiles cleared.",
+              });
+            }
+          },
+          onError: (errorMessage) => {
+            console.error("[Mines] Reveal error:", errorMessage);
+            cancelSocketRef.current = null;
+            patchState({ isPendingBet: false });
+          },
+        },
+      );
+      return;
+    }
 
     if (current.mineIndexes.includes(index)) {
       playSound("mine");
@@ -466,6 +659,7 @@ export function useMinesSession() {
 
   const clickCell = (index: number) => {
     const current = stateRef.current;
+    if (current.isPendingBet) return;
     if (current.mode === "auto" && !current.isRoundPlaying) {
       toggleAutoSelection(index);
       return;
@@ -515,7 +709,6 @@ export function useMinesSession() {
     const gridSize = current.gridSize;
     const numberOfMines = current.numberOfMines;
     const betAmount = current.betAmount;
-    const mineIndexes = createRandomMinesMineIndexes(gridSize, numberOfMines);
     const idleCells = applyMinesStorySelection(
       createMinesGridCells(gridSize),
       selectedIndexes,
@@ -524,14 +717,119 @@ export function useMinesSession() {
 
     patchState({
       cells: idleCells,
-      mineIndexes,
+      mineIndexes: [],
       selectedIndexes,
       isRoundPlaying: true,
+      isPendingBet: true,
       showWinModal: false,
       resultAnnouncement: createMinesStoryAnnouncement(
         "Autobet round started.",
       ),
     });
+
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      cancelSocketRef.current = sendMinesAutobetCommand(
+        socket,
+        {
+          amount: betAmount,
+          currencyId: wallet.currencyId,
+          numberOfMines,
+          gridSize,
+          selectedIndexes,
+        },
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            if (autobetGenerationRef.current !== generation) return;
+            const latest = stateRef.current;
+            if (latest.auto.kind !== "running" && latest.auto.kind !== "stopping") {
+              patchState({ isRoundPlaying: false, isPendingBet: false });
+              return;
+            }
+
+            if (!result.win) {
+              playSound("mine");
+              settleFinishedRound({
+                betAmount,
+                payoutAmount: "0",
+                multiplier: 0,
+                isWin: false,
+                auto: true,
+                cells: revealMinesStoryBoard({
+                  cells: idleCells,
+                  mineIndexes: result.mineIndexes,
+                  hitIndex: result.hitIndex,
+                }),
+                announcement: "Mine hit. Round lost.",
+              });
+            } else {
+              playSound("cashout");
+              settleFinishedRound({
+                betAmount,
+                payoutAmount: result.payoutAmount,
+                multiplier: result.payoutMultiplier,
+                isWin: true,
+                auto: true,
+                cells: revealMinesStoryBoard({
+                  cells: idleCells,
+                  mineIndexes: result.mineIndexes,
+                }),
+                announcement: "Autobet round won.",
+              });
+            }
+          },
+          onError: (errorMessage) => {
+            console.warn("[Mines:Autobet] Socket error, fallback to local:", errorMessage);
+            cancelSocketRef.current = null;
+            const mineIndexes = createRandomMinesMineIndexes(gridSize, numberOfMines);
+            const mineSet = new Set(mineIndexes);
+            const hitIndex = selectedIndexes.find((entry) => mineSet.has(entry));
+
+            if (hitIndex !== undefined) {
+              playSound("mine");
+              settleFinishedRound({
+                betAmount,
+                payoutAmount: "0",
+                multiplier: 0,
+                isWin: false,
+                auto: true,
+                cells: revealMinesStoryBoard({
+                  cells: idleCells,
+                  mineIndexes,
+                  hitIndex,
+                }),
+                announcement: "Mine hit. Round lost.",
+              });
+            } else {
+              const multiplier = getMinesStoryMultiplier(
+                gridSize,
+                numberOfMines,
+                selectedIndexes.length,
+              );
+              const payoutAmount = new BigNumber(betAmount).times(multiplier).toFixed();
+              playSound("cashout");
+              settleFinishedRound({
+                betAmount,
+                payoutAmount,
+                multiplier,
+                isWin: true,
+                auto: true,
+                cells: revealMinesStoryBoard({
+                  cells: idleCells,
+                  mineIndexes,
+                }),
+                announcement: "Autobet round won.",
+              });
+            }
+          },
+        },
+      );
+      return;
+    }
+
+    const mineIndexes = createRandomMinesMineIndexes(gridSize, numberOfMines);
+    patchState({ mineIndexes, isPendingBet: false });
 
     queueAutobetTimer(
       () => {
@@ -615,7 +913,7 @@ export function useMinesSession() {
 
   const placeManualBet = () => {
     const current = stateRef.current;
-    if (current.mode !== "manual") return;
+    if (current.mode !== "manual" || current.isPendingBet) return;
     if (current.isRoundPlaying) {
       cashout();
       return;
@@ -627,6 +925,7 @@ export function useMinesSession() {
     const current = stateRef.current;
     if (
       current.isRoundPlaying ||
+      current.isPendingBet ||
       current.mode !== "auto" ||
       !new BigNumber(current.betAmount).gt(0) ||
       current.selectedIndexes.length === 0 ||
@@ -651,6 +950,7 @@ export function useMinesSession() {
     const current = stateRef.current;
     if (
       current.isRoundPlaying ||
+      current.isPendingBet ||
       (current.auto.kind !== "paused" && current.auto.kind !== "failed")
     ) {
       return;
@@ -857,11 +1157,13 @@ export function useMinesSession() {
   return {
     ...state,
     wallet,
+    socketStatus,
+    isSocketConnected: connected,
     revealedSafeCount,
     currentMultiplier,
     currentPayoutAmount,
-    fieldsDisabled: state.isRoundPlaying || isAutobetActive(state.auto),
-    canCashout: state.isRoundPlaying && revealedSafeCount > 0,
+    fieldsDisabled: state.isRoundPlaying || state.isPendingBet || isAutobetActive(state.auto),
+    canCashout: state.isRoundPlaying && revealedSafeCount > 0 && !state.isPendingBet,
     hasSelection: state.selectedIndexes.length > 0,
     placeManualBet,
     handleAutoAction,

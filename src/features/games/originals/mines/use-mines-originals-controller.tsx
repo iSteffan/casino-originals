@@ -33,6 +33,7 @@ import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 import type { MinesOriginalsViewProps } from './mines-originals-view';
 
@@ -144,14 +145,21 @@ export function useMinesOriginalsController(
         ),
         winRate: formatWinRate(session.metrics.wins, session.metrics.losses),
       },
-      manualActionLabel: session.isRoundPlaying ? 'Cashout' : 'Place Bet',
+      manualActionLabel: session.isPendingBet
+        ? session.isRoundPlaying
+          ? 'Cashing out...'
+          : 'Starting...'
+        : session.isRoundPlaying
+          ? 'Cashout'
+          : 'Place Bet',
       autoActionLabel: autobetAction.label,
       autoActionVariant: autobetAction.variant,
-      manualActionDisabled: session.isRoundPlaying
+      manualActionDisabled: session.isPendingBet || (session.isRoundPlaying
         ? !session.canCashout
-        : !hasStake || exceedsWallet,
-      manualActionPending: false,
+        : !hasStake || exceedsWallet),
+      manualActionPending: session.isPendingBet,
       autoActionDisabled:
+        session.isPendingBet ||
         session.auto.kind === 'stopping' ||
         (session.isRoundPlaying && autobetAction.variant !== 'stop') ||
         (autobetAction.variant === 'start' && !canStartAuto),
@@ -258,6 +266,7 @@ export function useMinesOriginalsController(
     onVolumeChange: session.setVolume,
     onTheatreToggle: () => session.setTheatreMode(!session.theatreMode),
     onBackClick: () => undefined,
+    modeControl: <SocketStatusBadge status={session.socketStatus} />,
   };
 
   return {

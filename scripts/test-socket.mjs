@@ -69,12 +69,96 @@ async function testDiceBet() {
   });
 }
 
+async function testMinesGame() {
+  return new Promise((resolve, reject) => {
+    const socket = io('http://localhost:3001', {
+      transports: ['websocket'],
+    });
+
+    socket.on('connect', () => {
+      console.log('✅ Socket connected for Mines test!');
+
+      socket.emit(
+        'mines:start',
+        { amount: '5', currencyId: 'USDT', numberOfMines: 3, gridSize: 5 },
+        { requestId: 'mines_start_1' },
+      );
+    });
+
+    socket.on('mines:start:result', (data) => {
+      console.log('📥 Received mines:start:result:', data);
+      // Try revealing cell 0
+      socket.emit('mines:reveal', { index: 0 }, { requestId: 'mines_reveal_1' });
+    });
+
+    socket.on('mines:step:result', (step) => {
+      console.log('📥 Received mines:step:result (safe tile):', step);
+      // If safe, cash out
+      socket.emit('mines:cashout', {}, { requestId: 'mines_cashout_1' });
+    });
+
+    socket.on('mines:result', (res) => {
+      console.log('📥 Received mines:result (final):', res);
+      socket.disconnect();
+      resolve(res);
+    });
+
+    socket.on('exception', (err) => {
+      console.error('❌ Mines exception:', err);
+      socket.disconnect();
+      reject(err);
+    });
+  });
+}
+
+async function testMinesAutobet() {
+  return new Promise((resolve, reject) => {
+    const socket = io('http://localhost:3001', {
+      transports: ['websocket'],
+    });
+
+    socket.on('connect', () => {
+      console.log('✅ Socket connected for Mines Autobet test!');
+
+      socket.emit(
+        'mines:autobet',
+        {
+          amount: '10',
+          currencyId: 'USDT',
+          numberOfMines: 5,
+          gridSize: 5,
+          selectedIndexes: [2, 7, 12],
+        },
+        { requestId: 'mines_auto_1' },
+      );
+    });
+
+    socket.on('mines:autobet:result', (res) => {
+      console.log('📥 Received mines:autobet:result:', res);
+      socket.disconnect();
+      resolve(res);
+    });
+
+    socket.on('exception', (err) => {
+      console.error('❌ Mines autobet exception:', err);
+      socket.disconnect();
+      reject(err);
+    });
+  });
+}
+
 async function run() {
   console.log('Testing Health Check...');
   await testHealth();
 
   console.log('\nTesting Dice Bet Event...');
   await testDiceBet();
+
+  console.log('\nTesting Mines Manual Flow (start -> reveal -> cashout)...');
+  await testMinesGame();
+
+  console.log('\nTesting Mines Autobet Event...');
+  await testMinesAutobet();
 
   console.log('\nAll tests completed successfully!');
   process.exit(0);
