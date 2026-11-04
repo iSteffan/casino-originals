@@ -305,26 +305,93 @@ export function revealMinesStoryBoard({
   cells,
   mineIndexes,
   hitIndex,
+  selectedIndexes,
 }: {
   cells: readonly MinesGridCell[];
   mineIndexes: readonly number[];
   hitIndex?: number;
+  selectedIndexes?: readonly number[];
 }): MinesGridCell[] {
   const mineSet = new Set(mineIndexes);
+  const selectedSet = selectedIndexes ? new Set(selectedIndexes) : null;
 
   return cells.map((cell, index) => {
     const isMine = mineSet.has(index);
     const wasPlayerReveal = cell.revealed && cell.revealStyle === 'player';
     const isPlayerHit = hitIndex === index;
+    const isPlayerSelected = selectedSet ? selectedSet.has(index) : false;
+    const isPlayerTile = wasPlayerReveal || isPlayerHit || isPlayerSelected;
 
     return {
       revealed: true,
       content: isMine ? 'mine' : 'safe',
-      revealStyle: wasPlayerReveal || isPlayerHit ? 'player' : 'board',
+      revealStyle: isPlayerTile ? 'player' : 'board',
       selected: false,
-      cashoutLabel: wasPlayerReveal || isPlayerHit ? (cell.cashoutLabel ?? null) : null,
+      cashoutLabel: isPlayerTile ? (cell.cashoutLabel ?? null) : null,
       disabled: true,
     };
+  });
+}
+
+export function buildMinesAutobetRevealedCells({
+  cells,
+  mineIndexes,
+  selectedIndexes,
+  hitIndex,
+  isWin,
+  gridSize,
+  numberOfMines,
+  betAmount,
+  formatCashoutLabel,
+}: {
+  cells: readonly MinesGridCell[];
+  mineIndexes: readonly number[];
+  selectedIndexes: readonly number[];
+  hitIndex?: number;
+  isWin: boolean;
+  gridSize: MinesGridSize;
+  numberOfMines: number;
+  betAmount?: string;
+  formatCashoutLabel?: (betAmount: string, multiplier: number) => string;
+}): MinesGridCell[] {
+  const mineSet = new Set(mineIndexes);
+  const selectedSet = new Set(selectedIndexes);
+  const orderedPicks = [...selectedIndexes].sort((left, right) => left - right);
+
+  let safeCount = 0;
+  const cashoutMap = new Map<number, string>();
+  if (isWin && betAmount) {
+    const formatter = formatCashoutLabel ?? formatMinesStoryCashoutLabel;
+    for (const index of orderedPicks) {
+      if (!mineSet.has(index)) {
+        safeCount += 1;
+        const multiplier = getMinesStoryMultiplier(gridSize, numberOfMines, safeCount);
+        cashoutMap.set(index, formatter(betAmount, multiplier));
+      }
+    }
+  }
+
+  const preppedCells = cells.map((cell, index) => {
+    if (!selectedSet.has(index)) {
+      return { ...cell, selected: false };
+    }
+    const isMine = mineSet.has(index);
+    return {
+      ...cell,
+      revealed: true,
+      content: isMine ? ('mine' as const) : ('safe' as const),
+      revealStyle: 'player' as const,
+      selected: false,
+      cashoutLabel: cashoutMap.get(index) ?? null,
+      disabled: true,
+    };
+  });
+
+  return revealMinesStoryBoard({
+    cells: preppedCells,
+    mineIndexes,
+    hitIndex,
+    selectedIndexes,
   });
 }
 

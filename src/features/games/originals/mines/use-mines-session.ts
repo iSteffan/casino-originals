@@ -32,6 +32,7 @@ import {
   playMinesStorySound,
   preloadMinesStorySounds,
   revealMinesStoryBoard,
+  buildMinesAutobetRevealedCells,
   setMinesStorySoundsVolume,
   stopMinesStorySounds,
   type MinesStorySoundName,
@@ -756,10 +757,16 @@ export function useMinesSession() {
                 multiplier: 0,
                 isWin: false,
                 auto: true,
-                cells: revealMinesStoryBoard({
+                cells: buildMinesAutobetRevealedCells({
                   cells: idleCells,
                   mineIndexes: result.mineIndexes,
+                  selectedIndexes,
                   hitIndex: result.hitIndex,
+                  isWin: false,
+                  gridSize,
+                  numberOfMines,
+                  betAmount,
+                  formatCashoutLabel: formatCellCashoutLabel,
                 }),
                 announcement: "Mine hit. Round lost.",
               });
@@ -771,9 +778,15 @@ export function useMinesSession() {
                 multiplier: result.payoutMultiplier,
                 isWin: true,
                 auto: true,
-                cells: revealMinesStoryBoard({
+                cells: buildMinesAutobetRevealedCells({
                   cells: idleCells,
                   mineIndexes: result.mineIndexes,
+                  selectedIndexes,
+                  isWin: true,
+                  gridSize,
+                  numberOfMines,
+                  betAmount,
+                  formatCashoutLabel: formatCellCashoutLabel,
                 }),
                 announcement: "Autobet round won.",
               });
@@ -794,10 +807,16 @@ export function useMinesSession() {
                 multiplier: 0,
                 isWin: false,
                 auto: true,
-                cells: revealMinesStoryBoard({
+                cells: buildMinesAutobetRevealedCells({
                   cells: idleCells,
                   mineIndexes,
+                  selectedIndexes,
                   hitIndex,
+                  isWin: false,
+                  gridSize,
+                  numberOfMines,
+                  betAmount,
+                  formatCashoutLabel: formatCellCashoutLabel,
                 }),
                 announcement: "Mine hit. Round lost.",
               });
@@ -815,9 +834,15 @@ export function useMinesSession() {
                 multiplier,
                 isWin: true,
                 auto: true,
-                cells: revealMinesStoryBoard({
+                cells: buildMinesAutobetRevealedCells({
                   cells: idleCells,
                   mineIndexes,
+                  selectedIndexes,
+                  isWin: true,
+                  gridSize,
+                  numberOfMines,
+                  betAmount,
+                  formatCashoutLabel: formatCellCashoutLabel,
                 }),
                 announcement: "Autobet round won.",
               });
@@ -854,36 +879,21 @@ export function useMinesSession() {
             multiplier: 0,
             isWin: false,
             auto: true,
-            cells: revealMinesStoryBoard({
+            cells: buildMinesAutobetRevealedCells({
               cells: idleCells,
               mineIndexes,
+              selectedIndexes,
               hitIndex,
+              isWin: false,
+              gridSize,
+              numberOfMines,
+              betAmount,
+              formatCashoutLabel: formatCellCashoutLabel,
             }),
             announcement: "Mine hit. Round lost.",
           });
           return;
         }
-
-        let safeCount = 0;
-        const revealedSelected = idleCells.map((cell, index) => {
-          if (!orderedPicks.includes(index)) {
-            return { ...cell, selected: false };
-          }
-          safeCount += 1;
-          const multiplier = getMinesStoryMultiplier(
-            gridSize,
-            numberOfMines,
-            safeCount,
-          );
-          return {
-            revealed: true,
-            content: "safe" as const,
-            revealStyle: "player" as const,
-            selected: false,
-            cashoutLabel: formatCellCashoutLabel(betAmount, multiplier),
-            disabled: false,
-          };
-        });
 
         const multiplier = getMinesStoryMultiplier(
           gridSize,
@@ -900,9 +910,15 @@ export function useMinesSession() {
           multiplier,
           isWin: true,
           auto: true,
-          cells: revealMinesStoryBoard({
-            cells: revealedSelected,
+          cells: buildMinesAutobetRevealedCells({
+            cells: idleCells,
             mineIndexes,
+            selectedIndexes,
+            isWin: true,
+            gridSize,
+            numberOfMines,
+            betAmount,
+            formatCashoutLabel: formatCellCashoutLabel,
           }),
           announcement: "Autobet round won.",
         });

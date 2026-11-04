@@ -34,6 +34,7 @@ import {
   playMinesStorySound,
   preloadMinesStorySounds,
   revealMinesStoryBoard,
+  buildMinesAutobetRevealedCells,
   setMinesStorySoundsVolume,
   stopMinesStorySounds,
 } from '#ui/features/games/originals/mines/mines-story-helpers';
@@ -353,24 +354,17 @@ function MinesCompositionStory() {
         const orderedPicks = [...selectedIndexes].sort((left, right) => left - right);
 
         if (hitIndex != null) {
-          const preRevealCells = idleCells.map((cell, index) => {
-            if (!selectedIndexes.includes(index)) return cell;
-            return {
-              ...cell,
-              revealed: true,
-              content: mineSet.has(index) ? ('mine' as const) : ('safe' as const),
-              revealStyle: 'player' as const,
-              selected: false,
-              cashoutLabel: null,
-              disabled: true,
-            };
-          });
-
           updateArgs({
-            cells: revealMinesStoryBoard({
-              cells: preRevealCells,
+            cells: buildMinesAutobetRevealedCells({
+              cells: idleCells,
               mineIndexes,
+              selectedIndexes,
               hitIndex,
+              isWin: false,
+              gridSize,
+              numberOfMines,
+              betAmount,
+              formatCashoutLabel: formatMinesStoryCashoutLabel,
             }),
             roundActive: false,
             showWinModal: false,
@@ -386,24 +380,6 @@ function MinesCompositionStory() {
           return;
         }
 
-        let safeCount = 0;
-        const revealedSelected = idleCells.map((cell, index) => {
-          if (!orderedPicks.includes(index)) {
-            return { ...cell, selected: false };
-          }
-
-          safeCount += 1;
-          const multiplier = getMinesStoryMultiplier(gridSize, numberOfMines, safeCount);
-          return {
-            revealed: true,
-            content: 'safe' as const,
-            revealStyle: 'player' as const,
-            selected: false,
-            cashoutLabel: formatMinesStoryCashoutLabel(betAmount, multiplier),
-            disabled: false,
-          };
-        });
-
         const win = resolveWinPresentation(
           betAmount,
           gridSize,
@@ -412,9 +388,15 @@ function MinesCompositionStory() {
         );
 
         updateArgs({
-          cells: revealMinesStoryBoard({
-            cells: revealedSelected,
+          cells: buildMinesAutobetRevealedCells({
+            cells: idleCells,
             mineIndexes,
+            selectedIndexes,
+            isWin: true,
+            gridSize,
+            numberOfMines,
+            betAmount,
+            formatCashoutLabel: formatMinesStoryCashoutLabel,
           }),
           roundActive: false,
           showWinModal: true,
