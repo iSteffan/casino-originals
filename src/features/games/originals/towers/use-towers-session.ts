@@ -32,6 +32,7 @@ import {
   TOWERS_STORY_AUTOBET_NEXT_ROUND_DELAY_MS,
   TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
   TOWERS_STORY_CLEAR_BOARD_DELAY_MS,
+  type TowersStoryGridConfig,
   type TowersStorySoundName,
 } from "#ui/features/games/originals/towers/towers-story-helpers";
 import {
@@ -42,6 +43,13 @@ import {
 } from "#ui/features/wallet/wallet-balances";
 import { useWallet } from "#ui/features/wallet/wallet-provider";
 import { shouldReduceMotion } from "#ui/lib/motion";
+import { useGameSocket } from "#ui/features/games/shared/socket/game-socket";
+import {
+  sendTowersStartCommand,
+  sendTowersRevealCommand,
+  sendTowersCashoutCommand,
+  sendTowersAutobetCommand,
+} from "./towers-socket";
 
 const AUTOBET_CONTINUE_DELAY_MS =
   TOWERS_STORY_CLEAR_BOARD_DELAY_MS + TOWERS_STORY_AUTOBET_NEXT_ROUND_DELAY_MS;
@@ -64,6 +72,7 @@ interface TowersSessionState {
   trapColumns: number[][];
   clicked: number[];
   isRoundPlaying: boolean;
+  isPendingBet: boolean;
   roundStake: string;
   resultAnnouncement?: { id: string; message: string };
   showWinModal: boolean;
@@ -87,6 +96,8 @@ function getStopConditions(state: TowersSessionState): OriginalStopConditions {
 
 export function useTowersSession() {
   const wallet = useWallet();
+  const { socket, connected, status: socketStatus } = useGameSocket();
+  const cancelSocketRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<TowersSessionState>(() => {
     const difficulty = 0;
     const config = getTowersStoryGridConfigFromDifficulty(difficulty);
@@ -108,6 +119,7 @@ export function useTowersSession() {
       trapColumns: [],
       clicked: [],
       isRoundPlaying: false,
+      isPendingBet: false,
       roundStake: "0",
       showWinModal: false,
       winMultiplier: "x0.00",
@@ -201,6 +213,7 @@ export function useTowersSession() {
     preloadTowersStorySounds();
     const activeSounds = activeSoundsRef.current;
     return () => {
+      cancelSocketRef.current?.();
       clearBoardClearTimer();
       clearAutobetTimers();
       stopTowersStorySounds(activeSounds);
@@ -313,20 +326,79 @@ export function useTowersSession() {
 
   const startManualRound = () => {
     const current = stateRef.current;
-    if (current.isRoundPlaying || current.mode !== "manual") return false;
+    if (
+      current.isRoundPlaying ||
+      current.isPendingBet ||
+      current.mode !== "manual"
+    ) {
+      return false;
+    }
     if (!new BigNumber(current.betAmount).gt(0)) return false;
     if (!wallet.canAfford(current.betAmount)) return false;
 
     clearBoardClearTimer();
     stopTowersStorySounds(activeSoundsRef.current);
     const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
-    const trapColumns = createRandomTowersTrapColumns(config);
 
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      patchState({ isPendingBet: true });
+
+      cancelSocketRef.current = sendTowersStartCommand(
+        socket,
+        {
+          amount: current.betAmount,
+          currencyId: wallet.currencyId,
+          difficulty: current.difficulty,
+        },
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            patchState({
+              matrix: createTowersEmptyMatrix(config),
+              trapColumns: [],
+              clicked: [],
+              isRoundPlaying: true,
+              isPendingBet: false,
+              roundStake: result.betAmount,
+              showWinModal: false,
+              resultAnnouncement: createTowersStoryAnnouncement(
+                "Round started. Climb the tower.",
+              ),
+            });
+          },
+          onError: (errorMessage) => {
+            console.warn(
+              "[Towers] Socket start error, fallback to local:",
+              errorMessage,
+            );
+            cancelSocketRef.current = null;
+            const trapColumns = createRandomTowersTrapColumns(config);
+            patchState({
+              matrix: createTowersEmptyMatrix(config),
+              trapColumns,
+              clicked: [],
+              isRoundPlaying: true,
+              isPendingBet: false,
+              roundStake: current.betAmount,
+              showWinModal: false,
+              resultAnnouncement: createTowersStoryAnnouncement(
+                "Round started. Climb the tower.",
+              ),
+            });
+          },
+        },
+      );
+      return true;
+    }
+
+    const trapColumns = createRandomTowersTrapColumns(config);
     patchState({
       matrix: createTowersEmptyMatrix(config),
       trapColumns,
       clicked: [],
       isRoundPlaying: true,
+      isPendingBet: false,
       roundStake: current.betAmount,
       showWinModal: false,
       resultAnnouncement: createTowersStoryAnnouncement(
@@ -336,22 +408,20 @@ export function useTowersSession() {
     return true;
   };
 
-  const revealAt = (rowIndex: number, columnIndex: number, auto: boolean) => {
+  const performLocalReveal = (
+    rowIndex: number,
+    columnIndex: number,
+    auto: boolean,
+  ) => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying) return;
-    if (rowIndex !== current.clicked.length) return;
     const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
-    if (
-      rowIndex < 0 ||
-      rowIndex >= config.rows ||
-      columnIndex < 0 ||
-      columnIndex >= config.cols
-    ) {
-      return;
-    }
+    const trapColumns =
+      current.trapColumns.length > 0
+        ? current.trapColumns
+        : createRandomTowersTrapColumns(config);
 
     const rowValues = revealTowersRowValues(
-      current.trapColumns,
+      trapColumns,
       rowIndex,
       config.cols,
     );
@@ -364,10 +434,9 @@ export function useTowersSession() {
 
     if (hitTrap) {
       playSound("lose");
-      // Reveal remaining rows for clarity
       const fullMatrix = matrix.map((row, rIndex) => {
         if (row.some((tile) => tile !== null)) return row;
-        return revealTowersRowValues(current.trapColumns, rIndex, config.cols);
+        return revealTowersRowValues(trapColumns, rIndex, config.cols);
       });
       settleFinishedRound({
         betAmount,
@@ -404,16 +473,120 @@ export function useTowersSession() {
     patchState({
       matrix,
       clicked,
+      trapColumns,
+      isPendingBet: false,
       resultAnnouncement: createTowersStoryAnnouncement(
         `Safe on row ${rowIndex + 1}.`,
       ),
     });
   };
 
-  const cashout = () => {
+  const revealAt = (rowIndex: number, columnIndex: number, auto: boolean) => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying || current.mode !== "manual") return;
-    if (current.clicked.length === 0) return;
+    if (!current.isRoundPlaying || current.isPendingBet) return;
+    if (rowIndex !== current.clicked.length) return;
+    const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
+    if (
+      rowIndex < 0 ||
+      rowIndex >= config.rows ||
+      columnIndex < 0 ||
+      columnIndex >= config.cols
+    ) {
+      return;
+    }
+
+    if (!auto && socket && connected) {
+      cancelSocketRef.current?.();
+      patchState({ isPendingBet: true });
+
+      cancelSocketRef.current = sendTowersRevealCommand(
+        socket,
+        { rowIndex, columnIndex },
+        {
+          onStep: (result) => {
+            cancelSocketRef.current = null;
+            const latest = stateRef.current;
+            const rowValues = Array.from({ length: config.cols }, (_, colIdx) =>
+              result.rowTrapColumns.includes(colIdx),
+            );
+            const matrix = latest.matrix.map((row, index) =>
+              index === rowIndex ? rowValues : row,
+            );
+            const clicked = [...latest.clicked, columnIndex];
+            playSound("win");
+            patchState({
+              matrix,
+              clicked,
+              isPendingBet: false,
+              resultAnnouncement: createTowersStoryAnnouncement(
+                `Safe on row ${rowIndex + 1}.`,
+              ),
+            });
+          },
+          onEnd: (result) => {
+            cancelSocketRef.current = null;
+            const latest = stateRef.current;
+            const clicked = [...latest.clicked, columnIndex];
+            const betAmount = latest.roundStake || latest.betAmount;
+
+            if (result.isTrap) {
+              playSound("lose");
+              const fullMatrix = latest.matrix.map((row, rIndex) =>
+                revealTowersRowValues(result.trapColumns, rIndex, config.cols),
+              );
+              settleFinishedRound({
+                betAmount,
+                payoutAmount: "0",
+                multiplier: 0,
+                isWin: false,
+                auto: false,
+                matrix: fullMatrix,
+                clicked,
+                announcement: getTowersStoryBombAnnouncementMessage(rowIndex),
+              });
+            } else {
+              playSound("win");
+              const fullMatrix = latest.matrix.map((row, rIndex) => {
+                if (rIndex <= rowIndex) {
+                  return revealTowersRowValues(
+                    result.trapColumns,
+                    rIndex,
+                    config.cols,
+                  );
+                }
+                return row;
+              });
+              settleFinishedRound({
+                betAmount,
+                payoutAmount: result.payoutAmount,
+                multiplier: result.payoutMultiplier,
+                isWin: true,
+                auto: false,
+                matrix: fullMatrix,
+                clicked,
+                announcement: getTowersStoryTopReachedAnnouncementMessage(),
+              });
+            }
+          },
+          onError: (errorMessage) => {
+            console.warn(
+              "[Towers] Reveal error, fallback to local:",
+              errorMessage,
+            );
+            cancelSocketRef.current = null;
+            patchState({ isPendingBet: false });
+            performLocalReveal(rowIndex, columnIndex, auto);
+          },
+        },
+      );
+      return;
+    }
+
+    performLocalReveal(rowIndex, columnIndex, auto);
+  };
+
+  const performLocalCashout = () => {
+    const current = stateRef.current;
     const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
     const lastRow = current.clicked.length - 1;
     const multiplier = getTowersStoryMultiplierValue(config, lastRow);
@@ -432,9 +605,68 @@ export function useTowersSession() {
     });
   };
 
+  const cashout = () => {
+    const current = stateRef.current;
+    if (
+      !current.isRoundPlaying ||
+      current.isPendingBet ||
+      current.mode !== "manual"
+    ) {
+      return;
+    }
+    if (current.clicked.length === 0) return;
+    const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
+
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      patchState({ isPendingBet: true });
+
+      cancelSocketRef.current = sendTowersCashoutCommand(
+        socket,
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            const latest = stateRef.current;
+            playSound("win");
+            const fullMatrix = latest.matrix.map((row, rIndex) => {
+              if (row.some((tile) => tile !== null)) return row;
+              return revealTowersRowValues(
+                result.trapColumns,
+                rIndex,
+                config.cols,
+              );
+            });
+            settleFinishedRound({
+              betAmount: result.betAmount,
+              payoutAmount: result.payoutAmount,
+              multiplier: result.payoutMultiplier,
+              isWin: true,
+              auto: false,
+              matrix: fullMatrix,
+              clicked: latest.clicked,
+              announcement: "Cashed out.",
+            });
+          },
+          onError: (errorMessage) => {
+            console.warn(
+              "[Towers] Cashout error, fallback to local:",
+              errorMessage,
+            );
+            cancelSocketRef.current = null;
+            patchState({ isPendingBet: false });
+            performLocalCashout();
+          },
+        },
+      );
+      return;
+    }
+
+    performLocalCashout();
+  };
+
   const placeManualBet = () => {
     const current = stateRef.current;
-    if (current.mode !== "manual") return;
+    if (current.mode !== "manual" || current.isPendingBet) return;
     if (current.isRoundPlaying) {
       cashout();
       return;
@@ -462,17 +694,98 @@ export function useTowersSession() {
       applyAutobetEdit({ selection });
       return;
     }
-    if (current.mode === "manual" && current.isRoundPlaying) {
+    if (
+      current.mode === "manual" &&
+      current.isRoundPlaying &&
+      !current.isPendingBet
+    ) {
       revealAt(rowIndex, columnIndex, false);
     }
   };
 
   const randomPick = () => {
     const current = stateRef.current;
-    if (!current.isRoundPlaying || current.mode !== "manual") return;
+    if (
+      !current.isRoundPlaying ||
+      current.isPendingBet ||
+      current.mode !== "manual"
+    ) {
+      return;
+    }
     const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
     const columnIndex = Math.floor(Math.random() * config.cols);
     revealAt(current.clicked.length, columnIndex, false);
+  };
+
+  const runLocalAutoRound = (
+    generation: number,
+    config: TowersStoryGridConfig,
+    selection: readonly number[],
+    betAmount: string,
+    reduceMotion: boolean,
+  ) => {
+    const trapColumns = createRandomTowersTrapColumns(config);
+    patchState({ trapColumns });
+
+    const step = (stepIndex: number) => {
+      if (autobetGenerationRef.current !== generation) return;
+      const latest = stateRef.current;
+      if (latest.auto.kind !== "running" && latest.auto.kind !== "stopping") {
+        patchState({ isRoundPlaying: false });
+        return;
+      }
+
+      if (stepIndex >= selection.length) {
+        // Path complete — cashout at last safe row
+        const lastRow = latest.clicked.length - 1;
+        if (lastRow < 0) {
+          settleFinishedRound({
+            betAmount,
+            payoutAmount: "0",
+            multiplier: 0,
+            isWin: false,
+            auto: true,
+            matrix: latest.matrix,
+            clicked: latest.clicked,
+            announcement: "Autobet round lost.",
+          });
+          return;
+        }
+        const multiplier = getTowersStoryMultiplierValue(config, lastRow);
+        const payoutAmount = new BigNumber(betAmount)
+          .times(multiplier)
+          .toFixed();
+        playSound("win");
+        settleFinishedRound({
+          betAmount,
+          payoutAmount,
+          multiplier,
+          isWin: true,
+          auto: true,
+          matrix: latest.matrix,
+          clicked: latest.clicked,
+          announcement: "Autobet round won.",
+        });
+        return;
+      }
+
+      const columnIndex = selection[stepIndex]!;
+      const rowIndex = latest.clicked.length;
+      revealAt(rowIndex, columnIndex, true);
+
+      const after = stateRef.current;
+      if (!after.isRoundPlaying) return; // settled (win/lose)
+
+      queueAutobetTimer(
+        () => step(stepIndex + 1),
+        reduceMotion ? 0 : TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
+      );
+    };
+
+    queueAutobetTimer(
+      () => step(0),
+      reduceMotion ? 0 : TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
+    );
   };
 
   const runAutoRound = () => {
@@ -512,77 +825,159 @@ export function useTowersSession() {
     clearAutobetTimers();
     const generation = ++autobetGenerationRef.current;
     const config = getTowersStoryGridConfigFromDifficulty(current.difficulty);
-    const trapColumns = createRandomTowersTrapColumns(config);
     const selection = [...current.selection];
     const betAmount = current.betAmount;
     const reduceMotion = shouldReduceMotion();
 
     patchState({
       matrix: createTowersEmptyMatrix(config),
-      trapColumns,
+      trapColumns: [],
       clicked: [],
       isRoundPlaying: true,
       roundStake: betAmount,
       showWinModal: false,
-      resultAnnouncement: createTowersStoryAnnouncement("Autobet round started."),
+      resultAnnouncement: createTowersStoryAnnouncement(
+        "Autobet round started.",
+      ),
     });
 
-    const step = (stepIndex: number) => {
-      if (autobetGenerationRef.current !== generation) return;
-      const latest = stateRef.current;
-      if (latest.auto.kind !== "running" && latest.auto.kind !== "stopping") {
-        patchState({ isRoundPlaying: false });
-        return;
-      }
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      cancelSocketRef.current = sendTowersAutobetCommand(
+        socket,
+        {
+          amount: betAmount,
+          currencyId: wallet.currencyId,
+          difficulty: current.difficulty,
+          selection,
+        },
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            if (autobetGenerationRef.current !== generation) return;
+            const latest = stateRef.current;
+            if (
+              latest.auto.kind !== "running" &&
+              latest.auto.kind !== "stopping"
+            ) {
+              patchState({ isRoundPlaying: false, isPendingBet: false });
+              return;
+            }
 
-      if (stepIndex >= selection.length) {
-        // Path complete — cashout at last safe row
-        const lastRow = latest.clicked.length - 1;
-        if (lastRow < 0) {
-          settleFinishedRound({
-            betAmount,
-            payoutAmount: "0",
-            multiplier: 0,
-            isWin: false,
-            auto: true,
-            matrix: latest.matrix,
-            clicked: latest.clicked,
-            announcement: "Autobet round lost.",
-          });
-          return;
-        }
-        const multiplier = getTowersStoryMultiplierValue(config, lastRow);
-        const payoutAmount = new BigNumber(betAmount).times(multiplier).toFixed();
-        playSound("win");
-        settleFinishedRound({
-          betAmount,
-          payoutAmount,
-          multiplier,
-          isWin: true,
-          auto: true,
-          matrix: latest.matrix,
-          clicked: latest.clicked,
-          announcement: "Autobet round won.",
-        });
-        return;
-      }
+            const step = (stepIndex: number) => {
+              if (autobetGenerationRef.current !== generation) return;
+              const currentStepState = stateRef.current;
+              if (
+                currentStepState.auto.kind !== "running" &&
+                currentStepState.auto.kind !== "stopping"
+              ) {
+                patchState({ isRoundPlaying: false });
+                return;
+              }
 
-      const columnIndex = selection[stepIndex]!;
-      const rowIndex = latest.clicked.length;
-      revealAt(rowIndex, columnIndex, true);
+              if (result.win && stepIndex >= selection.length) {
+                playSound("win");
+                settleFinishedRound({
+                  betAmount,
+                  payoutAmount: result.payoutAmount,
+                  multiplier: result.payoutMultiplier,
+                  isWin: true,
+                  auto: true,
+                  matrix: currentStepState.matrix,
+                  clicked: currentStepState.clicked,
+                  announcement: "Autobet round won.",
+                });
+                return;
+              }
 
-      const after = stateRef.current;
-      if (!after.isRoundPlaying) return; // settled (win/lose)
+              if (!result.win && stepIndex === result.hitRow) {
+                const columnIndex = selection[stepIndex]!;
+                const rowValues = revealTowersRowValues(
+                  result.trapColumns,
+                  stepIndex,
+                  config.cols,
+                );
+                const matrix = currentStepState.matrix.map((row, index) =>
+                  index === stepIndex ? rowValues : row,
+                );
+                const clicked = [...currentStepState.clicked, columnIndex];
+                playSound("lose");
+                const fullMatrix = matrix.map((row, rIndex) =>
+                  revealTowersRowValues(
+                    result.trapColumns,
+                    rIndex,
+                    config.cols,
+                  ),
+                );
+                settleFinishedRound({
+                  betAmount,
+                  payoutAmount: "0",
+                  multiplier: 0,
+                  isWin: false,
+                  auto: true,
+                  matrix: fullMatrix,
+                  clicked,
+                  announcement:
+                    getTowersStoryBombAnnouncementMessage(stepIndex),
+                });
+                return;
+              }
 
-      queueAutobetTimer(
-        () => step(stepIndex + 1),
-        reduceMotion ? 0 : TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
+              const columnIndex = selection[stepIndex]!;
+              const rowValues = revealTowersRowValues(
+                result.trapColumns,
+                stepIndex,
+                config.cols,
+              );
+              const matrix = currentStepState.matrix.map((row, index) =>
+                index === stepIndex ? rowValues : row,
+              );
+              const clicked = [...currentStepState.clicked, columnIndex];
+              playSound("win");
+              patchState({
+                matrix,
+                clicked,
+                resultAnnouncement: createTowersStoryAnnouncement(
+                  `Safe on row ${stepIndex + 1}.`,
+                ),
+              });
+
+              queueAutobetTimer(
+                () => step(stepIndex + 1),
+                reduceMotion ? 0 : TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
+              );
+            };
+
+            queueAutobetTimer(
+              () => step(0),
+              reduceMotion ? 0 : TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
+            );
+          },
+          onError: (errorMessage) => {
+            console.warn(
+              "[Towers:Autobet] Socket error, fallback to local:",
+              errorMessage,
+            );
+            cancelSocketRef.current = null;
+            runLocalAutoRound(
+              generation,
+              config,
+              selection,
+              betAmount,
+              reduceMotion,
+            );
+          },
+        },
       );
-    };
+      return;
+    }
 
-    queueAutobetTimer(
-      () => step(0),
-      reduceMotion ? 0 : TOWERS_STORY_AUTOBET_REVEAL_DELAY_MS,
+    runLocalAutoRound(
+      generation,
+      config,
+      selection,
+      betAmount,
+      reduceMotion,
     );
   };
 
@@ -788,8 +1183,15 @@ export function useTowersSession() {
   return {
     ...state,
     wallet,
-    fieldsDisabled: state.isRoundPlaying || isAutobetActive(state.auto),
-    canCashout: state.isRoundPlaying && state.clicked.length > 0,
+    socketStatus,
+    fieldsDisabled:
+      state.isRoundPlaying ||
+      state.isPendingBet ||
+      isAutobetActive(state.auto),
+    canCashout:
+      state.isRoundPlaying &&
+      !state.isPendingBet &&
+      state.clicked.length > 0,
     hasSelection: state.selection.length > 0,
     placeManualBet,
     handleAutoAction,

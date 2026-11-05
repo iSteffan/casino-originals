@@ -38,6 +38,7 @@ import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 import type { TowersOriginalsViewProps } from './towers-originals-view';
 
@@ -350,6 +351,7 @@ export function useTowersOriginalsController(
     onVolumeChange: session.setVolume,
     onTheatreToggle: () => session.setTheatreMode(!session.theatreMode),
     onBackClick: () => undefined,
+    modeControl: <SocketStatusBadge status={session.socketStatus} />,
   };
 
   return {

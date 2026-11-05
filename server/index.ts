@@ -99,6 +99,72 @@ function generateMineIndexes(
 
 const activeMinesGames = new Map<string, ActiveMinesGame>();
 
+export interface TowersStartPayload {
+  amount: string;
+  currencyId?: string;
+  difficulty?: number;
+  clientSeed?: string;
+}
+
+export interface TowersRevealPayload {
+  rowIndex: number;
+  columnIndex: number;
+}
+
+export interface TowersAutobetPayload {
+  amount: string;
+  currencyId?: string;
+  difficulty?: number;
+  selection: number[];
+  clientSeed?: string;
+}
+
+interface TowersGridConfig {
+  rows: number;
+  cols: number;
+  trapsPerRow: number;
+}
+
+const TOWERS_CONFIGS: Record<number, TowersGridConfig> = {
+  0: { rows: 10, cols: 3, trapsPerRow: 1 }, // Easy
+  1: { rows: 10, cols: 2, trapsPerRow: 1 }, // Medium
+  2: { rows: 10, cols: 3, trapsPerRow: 2 }, // Hard
+};
+
+function getTowersGridConfig(difficulty = 0): TowersGridConfig {
+  return TOWERS_CONFIGS[difficulty] ?? TOWERS_CONFIGS[0]!;
+}
+
+function computeTowersMultiplier(cols: number, trapsPerRow: number, row: number): number {
+  const mult = (cols / (cols - trapsPerRow)) ** (row + 1) * 0.98;
+  return Number(mult.toFixed(4));
+}
+
+function generateTowersTrapColumns(config: TowersGridConfig): number[][] {
+  return Array.from({ length: config.rows }, () => {
+    const indexes = Array.from({ length: config.cols }, (_, i) => i);
+    for (let i = indexes.length - 1; i > 0; i--) {
+      const j = crypto.randomInt(0, i + 1);
+      const temp = indexes[i]!;
+      indexes[i] = indexes[j]!;
+      indexes[j] = temp;
+    }
+    return indexes.slice(0, config.trapsPerRow).sort((a, b) => a - b);
+  });
+}
+
+interface ActiveTowersGame {
+  betAmount: string;
+  currencyId: string;
+  difficulty: number;
+  config: TowersGridConfig;
+  trapColumns: number[][];
+  revealedPicks: { rowIndex: number; columnIndex: number }[];
+  isCompleted: boolean;
+}
+
+const activeTowersGames = new Map<string, ActiveTowersGame>();
+
 // Create HTTP server for health checks (useful for Render/Koyeb keep-alive)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -528,8 +594,404 @@ io.on('connection', (socket: Socket) => {
     },
   );
 
+  socket.on(
+    'towers:start',
+    (payload: TowersStartPayload, meta?: RequestMeta) => {
+      try {
+        const { amount, currencyId = 'btc', difficulty = 0 } = payload ?? {};
+        const betBig = new BigNumber(amount);
+        if (!betBig.isFinite() || betBig.lte(0)) {
+          socket.emit(
+            'exception',
+            { message: 'Bet amount must be greater than zero.' },
+            meta,
+          );
+          return;
+        }
+
+        const safeDifficulty = [0, 1, 2].includes(difficulty) ? difficulty : 0;
+        const config = getTowersGridConfig(safeDifficulty);
+        const trapColumns = generateTowersTrapColumns(config);
+
+        activeTowersGames.set(socket.id, {
+          betAmount: betBig.toFixed(),
+          currencyId,
+          difficulty: safeDifficulty,
+          config,
+          trapColumns,
+          revealedPicks: [],
+          isCompleted: false,
+        });
+
+        const nextMultiplier = computeTowersMultiplier(
+          config.cols,
+          config.trapsPerRow,
+          0,
+        );
+
+        console.log(
+          `[Towers:Start] ${socket.id} started game -> Diff: ${safeDifficulty}, Amount: ${betBig.toFixed()} ${currencyId}`,
+        );
+
+        socket.emit(
+          'towers:start:result',
+          {
+            status: 'in_progress',
+            betAmount: betBig.toFixed(),
+            difficulty: safeDifficulty,
+            rows: config.rows,
+            cols: config.cols,
+            trapsPerRow: config.trapsPerRow,
+            nextMultiplier,
+          },
+          meta,
+        );
+      } catch (err: unknown) {
+        console.error('[Towers:Start] Error:', err);
+        socket.emit(
+          'exception',
+          {
+            message:
+              err instanceof Error ? err.message : 'Error starting Towers.',
+          },
+          meta,
+        );
+      }
+    },
+  );
+
+  socket.on(
+    'towers:reveal',
+    (payload: TowersRevealPayload, meta?: RequestMeta) => {
+      try {
+        const game = activeTowersGames.get(socket.id);
+        if (!game || game.isCompleted) {
+          socket.emit(
+            'exception',
+            { message: 'No active Towers game. Start a new round.' },
+            meta,
+          );
+          return;
+        }
+
+        const { rowIndex, columnIndex } = payload ?? {};
+        if (typeof rowIndex !== 'number' || typeof columnIndex !== 'number') {
+          socket.emit(
+            'exception',
+            { message: 'Row and column indexes are required.' },
+            meta,
+          );
+          return;
+        }
+
+        const expectedRow = game.revealedPicks.length;
+        if (rowIndex !== expectedRow) {
+          socket.emit(
+            'exception',
+            {
+              message: `Expected pick for row ${expectedRow + 1}, got row ${rowIndex + 1}.`,
+            },
+            meta,
+          );
+          return;
+        }
+
+        if (columnIndex < 0 || columnIndex >= game.config.cols) {
+          socket.emit(
+            'exception',
+            {
+              message: `Column index out of bounds (0-${game.config.cols - 1}).`,
+            },
+            meta,
+          );
+          return;
+        }
+
+        const rowTraps = game.trapColumns[rowIndex] ?? [];
+        const isTrap = rowTraps.includes(columnIndex);
+
+        if (isTrap) {
+          game.isCompleted = true;
+          activeTowersGames.delete(socket.id);
+          console.log(
+            `[Towers:Reveal] ${socket.id} hit trap at row ${rowIndex + 1}, col ${columnIndex + 1} -> LOSS`,
+          );
+
+          socket.emit(
+            'towers:result',
+            {
+              status: 'lost',
+              isTrap: true,
+              hitRow: rowIndex,
+              hitColumn: columnIndex,
+              trapColumns: game.trapColumns,
+              payoutMultiplier: 0,
+              betAmount: game.betAmount,
+              payoutAmount: '0',
+              isCompleted: true,
+            },
+            meta,
+          );
+          return;
+        }
+
+        game.revealedPicks.push({ rowIndex, columnIndex });
+        const multiplier = computeTowersMultiplier(
+          game.config.cols,
+          game.config.trapsPerRow,
+          rowIndex,
+        );
+        const reachedTop = rowIndex + 1 >= game.config.rows;
+
+        if (reachedTop) {
+          game.isCompleted = true;
+          activeTowersGames.delete(socket.id);
+          const payoutAmount = new BigNumber(game.betAmount)
+            .times(multiplier)
+            .toFixed();
+          console.log(
+            `[Towers:Reveal] ${socket.id} reached top at row ${rowIndex + 1} -> WON (${payoutAmount} ${game.currencyId})`,
+          );
+
+          socket.emit(
+            'towers:result',
+            {
+              status: 'won',
+              isTrap: false,
+              revealedRow: rowIndex,
+              revealedColumn: columnIndex,
+              trapColumns: game.trapColumns,
+              payoutMultiplier: multiplier,
+              betAmount: game.betAmount,
+              payoutAmount,
+              isCompleted: true,
+            },
+            meta,
+          );
+          return;
+        }
+
+        const currentPayout = new BigNumber(game.betAmount)
+          .times(multiplier)
+          .toFixed();
+        const nextMultiplier = computeTowersMultiplier(
+          game.config.cols,
+          game.config.trapsPerRow,
+          rowIndex + 1,
+        );
+
+        socket.emit(
+          'towers:step:result',
+          {
+            status: 'in_progress',
+            isTrap: false,
+            rowIndex,
+            columnIndex,
+            rowTrapColumns: rowTraps,
+            payoutMultiplier: multiplier,
+            currentPayout,
+            nextMultiplier,
+            isCompleted: false,
+          },
+          meta,
+        );
+      } catch (err: unknown) {
+        console.error('[Towers:Reveal] Error:', err);
+        socket.emit(
+          'exception',
+          {
+            message:
+              err instanceof Error ? err.message : 'Error in Towers reveal.',
+          },
+          meta,
+        );
+      }
+    },
+  );
+
+  socket.on('towers:cashout', (_data: unknown, meta?: RequestMeta) => {
+    try {
+      const game = activeTowersGames.get(socket.id);
+      if (!game || game.isCompleted) {
+        socket.emit(
+          'exception',
+          { message: 'No active Towers game to cash out.' },
+          meta,
+        );
+        return;
+      }
+
+      if (game.revealedPicks.length === 0) {
+        socket.emit(
+          'exception',
+          {
+            message:
+              'Cannot cash out before completing at least one safe row.',
+          },
+          meta,
+        );
+        return;
+      }
+
+      const lastRow = game.revealedPicks.length - 1;
+      const multiplier = computeTowersMultiplier(
+        game.config.cols,
+        game.config.trapsPerRow,
+        lastRow,
+      );
+      const payoutAmount = new BigNumber(game.betAmount)
+        .times(multiplier)
+        .toFixed();
+
+      game.isCompleted = true;
+      activeTowersGames.delete(socket.id);
+      console.log(
+        `[Towers:Cashout] ${socket.id} cashed out at row ${lastRow + 1} -> Multiplier: ${multiplier}x, Payout: ${payoutAmount} ${game.currencyId}`,
+      );
+
+      socket.emit(
+        'towers:result',
+        {
+          status: 'cashed_out',
+          isTrap: false,
+          trapColumns: game.trapColumns,
+          payoutMultiplier: multiplier,
+          betAmount: game.betAmount,
+          payoutAmount,
+          isCompleted: true,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Towers:Cashout] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error ? err.message : 'Error cashing out Towers.',
+        },
+        meta,
+      );
+    }
+  });
+
+  socket.on(
+    'towers:autobet',
+    (payload: TowersAutobetPayload, meta?: RequestMeta) => {
+      try {
+        const {
+          amount,
+          currencyId = 'btc',
+          difficulty = 0,
+          selection,
+        } = payload ?? {};
+        if (
+          !Array.isArray(selection) ||
+          selection.length === 0 ||
+          selection.length > 10
+        ) {
+          socket.emit(
+            'exception',
+            { message: 'Selection must be an array of 1 to 10 row picks.' },
+            meta,
+          );
+          return;
+        }
+
+        const betBig = new BigNumber(amount);
+        if (!betBig.isFinite() || betBig.lte(0)) {
+          socket.emit(
+            'exception',
+            { message: 'Bet amount must be greater than zero.' },
+            meta,
+          );
+          return;
+        }
+
+        const safeDifficulty = [0, 1, 2].includes(difficulty) ? difficulty : 0;
+        const config = getTowersGridConfig(safeDifficulty);
+
+        for (let r = 0; r < selection.length; r++) {
+          const col = selection[r];
+          if (typeof col !== 'number' || col < 0 || col >= config.cols) {
+            socket.emit(
+              'exception',
+              { message: `Invalid column pick ${col} at row ${r + 1}.` },
+              meta,
+            );
+            return;
+          }
+        }
+
+        const trapColumns = generateTowersTrapColumns(config);
+
+        for (let r = 0; r < selection.length; r++) {
+          const col = selection[r]!;
+          if (trapColumns[r]!.includes(col)) {
+            console.log(
+              `[Towers:Autobet] ${socket.id} hit trap at row ${r + 1}, col ${col + 1} -> LOSS (${amount} ${currencyId})`,
+            );
+            socket.emit(
+              'towers:autobet:result',
+              {
+                win: false,
+                payoutMultiplier: 0,
+                betAmount: betBig.toFixed(),
+                payoutAmount: '0',
+                hitRow: r,
+                hitColumn: col,
+                trapColumns,
+                selection,
+              },
+              meta,
+            );
+            return;
+          }
+        }
+
+        const lastRow = selection.length - 1;
+        const multiplier = computeTowersMultiplier(
+          config.cols,
+          config.trapsPerRow,
+          lastRow,
+        );
+        const payoutAmount = betBig.times(multiplier).toFixed();
+
+        console.log(
+          `[Towers:Autobet] ${socket.id} completed ${selection.length} rows -> Multiplier: ${multiplier}x, Payout: ${payoutAmount} ${currencyId}`,
+        );
+
+        socket.emit(
+          'towers:autobet:result',
+          {
+            win: true,
+            payoutMultiplier: multiplier,
+            betAmount: betBig.toFixed(),
+            payoutAmount,
+            trapColumns,
+            selection,
+          },
+          meta,
+        );
+      } catch (err: unknown) {
+        console.error('[Towers:Autobet] Error processing autobet:', err);
+        socket.emit(
+          'exception',
+          {
+            message:
+              err instanceof Error
+                ? err.message
+                : 'Error processing Towers autobet.',
+          },
+          meta,
+        );
+      }
+    },
+  );
+
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);
+    activeTowersGames.delete(socket.id);
     console.log(`[Socket.io] Player disconnected: ${socket.id}`);
   });
 });
