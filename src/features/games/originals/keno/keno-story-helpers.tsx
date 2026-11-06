@@ -337,6 +337,7 @@ export interface KenoStoryManualRoundUpdate {
 export function scheduleKenoStoryManualRound({
   cells,
   pickedNumbers,
+  drawnNumbers: preDrawnNumbers,
   risk,
   reducedMotion,
   betAmount,
@@ -347,6 +348,7 @@ export function scheduleKenoStoryManualRound({
 }: {
   cells: readonly KenoGridCell[];
   pickedNumbers: readonly number[];
+  drawnNumbers?: readonly number[];
   risk: string;
   reducedMotion: boolean;
   betAmount: string;
@@ -356,7 +358,8 @@ export function scheduleKenoStoryManualRound({
   onReveal?: (result: 'win' | 'missed') => void;
 }): void {
   const pickedSet = new Set(pickedNumbers);
-  const drawnNumbers = drawKenoStoryNumbers(cells, KENO_STORY_DRAW_COUNT);
+  const drawnNumbers =
+    preDrawnNumbers ?? drawKenoStoryNumbers(cells, KENO_STORY_DRAW_COUNT);
   const hitsTotal = pickedNumbers.filter((number) =>
     drawnNumbers.includes(number),
   ).length;

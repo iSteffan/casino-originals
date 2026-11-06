@@ -165,6 +165,95 @@ interface ActiveTowersGame {
 
 const activeTowersGames = new Map<string, ActiveTowersGame>();
 
+export interface KenoBetPayload {
+  amount: string;
+  currencyId?: string;
+  risk?: 'classic' | 'low' | 'medium' | 'high';
+  selectedNumbers: number[];
+  clientSeed?: string;
+}
+
+export interface KenoBetResult {
+  selectedNumbers: number[];
+  drawnNumbers: number[];
+  hits: number[];
+  hitsCount: number;
+  risk: 'classic' | 'low' | 'medium' | 'high';
+  payoutMultiplier: number;
+  betAmount: string;
+  payoutAmount: string;
+  isWin: boolean;
+}
+
+const KENO_PAYTABLES: Record<string, readonly (readonly number[])[]> = {
+  classic: [
+    [0, 3.92],
+    [0, 1.8, 5],
+    [0, 1, 3, 11],
+    [0, 0.8, 1.7, 5.2, 25],
+    [0, 0.2, 1.3, 4.2, 17, 50],
+    [0, 0, 1, 3.6, 7.1, 17, 50],
+    [0, 0, 0.47, 3, 4.3, 14, 35, 75],
+    [0, 0, 0, 2.2, 4, 12, 24, 70, 100],
+    [0, 0, 0, 1.5, 3, 8, 16, 50, 70, 100],
+    [0, 0, 0, 1.4, 2.2, 4.4, 8, 20, 75, 100, 150],
+  ],
+  low: [
+    [0.6, 2.1],
+    [0, 1.9, 4.35],
+    [0, 1, 1.45, 28],
+    [0, 0, 2, 8.2, 100],
+    [0, 0, 1.5, 4, 13.4, 310],
+    [0, 0, 1, 2, 6.6, 105, 800],
+    [0, 0, 1.1, 1.5, 3.6, 15, 240, 1000],
+    [0, 0, 1.1, 1.5, 2, 5, 36, 150, 1000],
+    [0, 0, 1.1, 1.3, 1.6, 2.4, 8, 60, 350, 1000],
+    [0, 0, 1, 1.2, 1.3, 2, 5, 20, 100, 500, 1000],
+  ],
+  medium: [
+    [0.3, 3],
+    [0, 1.7, 5.7],
+    [0, 0, 2.6, 51.5],
+    [0, 0, 1.6, 10.1, 105],
+    [0, 0, 1.3, 4, 15, 420],
+    [0, 0, 0, 3, 9, 175, 770],
+    [0, 0, 0, 2, 7, 28, 410, 1000],
+    [0, 0, 0, 2, 4, 11, 56, 500, 1000],
+    [0, 0, 0, 2, 2.4, 5, 15, 110, 600, 1000],
+    [0, 0, 0, 1.5, 2.1, 4, 7.5, 27, 125, 600, 1000],
+  ],
+  high: [
+    [0, 3.92],
+    [0, 0.3, 15],
+    [0, 0, 0.5, 75],
+    [0, 0, 0, 7, 305],
+    [0, 0, 0, 4.5, 45, 500],
+    [0, 0, 0, 0, 11.5, 330, 1000],
+    [0, 0, 0, 0, 7, 90, 370, 1000],
+    [0, 0, 0, 0, 5, 20, 260, 650, 1000],
+    [0, 0, 0, 0, 4, 11, 52, 520, 850, 1000],
+    [0, 0, 0, 0, 3.5, 8, 13, 50, 500, 850, 1000],
+  ],
+};
+
+function getKenoMultiplier(selectedCount: number, hits: number, risk = 'medium'): number {
+  const safeRisk = ['classic', 'low', 'medium', 'high'].includes(risk) ? risk : 'medium';
+  const paytable = KENO_PAYTABLES[safeRisk];
+  const row = paytable?.[selectedCount - 1];
+  return row?.[hits] ?? 0;
+}
+
+function drawKenoNumbers(drawCount = 10, totalCount = 40): number[] {
+  const numbers = Array.from({ length: totalCount }, (_, i) => i + 1);
+  for (let i = totalCount - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    const temp = numbers[i]!;
+    numbers[i] = numbers[j]!;
+    numbers[j] = temp;
+  }
+  return numbers.slice(0, drawCount);
+}
+
 // Create HTTP server for health checks (useful for Render/Koyeb keep-alive)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -988,6 +1077,105 @@ io.on('connection', (socket: Socket) => {
       }
     },
   );
+
+  const handleKenoBet = (payload: KenoBetPayload, meta?: RequestMeta) => {
+    try {
+      const {
+        amount,
+        currencyId = 'btc',
+        risk = 'medium',
+        selectedNumbers,
+      } = payload ?? {};
+
+      if (
+        !Array.isArray(selectedNumbers) ||
+        selectedNumbers.length === 0 ||
+        selectedNumbers.length > 10
+      ) {
+        socket.emit(
+          'exception',
+          { message: 'Must select between 1 and 10 numbers.' },
+          meta,
+        );
+        return;
+      }
+
+      const betBig = new BigNumber(amount);
+      if (!betBig.isFinite() || betBig.lte(0)) {
+        socket.emit(
+          'exception',
+          { message: 'Bet amount must be greater than zero.' },
+          meta,
+        );
+        return;
+      }
+
+      const validRisk = ['classic', 'low', 'medium', 'high'].includes(risk)
+        ? risk
+        : 'medium';
+
+      const uniquePicks = Array.from(new Set(selectedNumbers));
+      if (
+        uniquePicks.length !== selectedNumbers.length ||
+        uniquePicks.some((n) => typeof n !== 'number' || n < 1 || n > 40)
+      ) {
+        socket.emit(
+          'exception',
+          {
+            message:
+              'Selected numbers must be unique integers between 1 and 40.',
+          },
+          meta,
+        );
+        return;
+      }
+
+      const drawnNumbers = drawKenoNumbers(10, 40);
+      const drawnSet = new Set(drawnNumbers);
+      const hits = uniquePicks.filter((n) => drawnSet.has(n));
+      const hitsCount = hits.length;
+      const multiplier = getKenoMultiplier(
+        uniquePicks.length,
+        hitsCount,
+        validRisk,
+      );
+      const payoutAmount = betBig.times(multiplier).toFixed();
+      const isWin = multiplier > 0;
+
+      console.log(
+        `[Keno:Bet] ${socket.id} picked [${uniquePicks.join(',')}] (${validRisk}) -> ${hitsCount} hits, Mult: ${multiplier}x, Payout: ${payoutAmount} ${currencyId}`,
+      );
+
+      socket.emit(
+        'keno:result',
+        {
+          selectedNumbers: uniquePicks,
+          drawnNumbers,
+          hits,
+          hitsCount,
+          risk: validRisk,
+          payoutMultiplier: multiplier,
+          betAmount: betBig.toFixed(),
+          payoutAmount,
+          isWin,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Keno:Bet] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error ? err.message : 'Error processing Keno bet.',
+        },
+        meta,
+      );
+    }
+  };
+
+  socket.on('keno:bet', handleKenoBet);
+  socket.on('keno:play', handleKenoBet);
 
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);

@@ -39,6 +39,8 @@ import {
 } from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
 import { shouldReduceMotion } from '#ui/lib/motion';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
+import { sendKenoBetCommand } from './keno-socket';
 
 const AUTOBET_CONTINUE_DELAY_MS = 300;
 
@@ -65,6 +67,7 @@ interface KenoSessionState {
   isActiveOnLoss: boolean;
   cells: KenoGridCell[];
   isRoundPlaying: boolean;
+  isPendingBet: boolean;
   reachedHits: number | null;
   resultAnnouncement?: KenoBoardProps['resultAnnouncement'];
   showWinModal: boolean;
@@ -88,6 +91,8 @@ function getStopConditions(state: KenoSessionState): OriginalStopConditions {
 
 export function useKenoSession() {
   const wallet = useWallet();
+  const { socket, connected, status: socketStatus } = useGameSocket();
+  const cancelSocketRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<KenoSessionState>(() => ({
     mode: 'manual',
     betAmount: '0',
@@ -103,6 +108,7 @@ export function useKenoSession() {
     isActiveOnLoss: false,
     cells: createKenoGridCells(),
     isRoundPlaying: false,
+    isPendingBet: false,
     reachedHits: null,
     showWinModal: false,
     winMultiplier: 'x0.00',
@@ -136,10 +142,13 @@ export function useKenoSession() {
   const cancelRound = () => {
     roundRunIdRef.current += 1;
     clearRoundTimers();
+    cancelSocketRef.current?.();
+    cancelSocketRef.current = null;
     stopKenoStorySounds(activeSoundsRef.current);
     pendingRoundRef.current = null;
     patchState({
       isRoundPlaying: false,
+      isPendingBet: false,
       reachedHits: null,
       showWinModal: false,
       resultAnnouncement: undefined,
@@ -149,6 +158,7 @@ export function useKenoSession() {
   useEffect(() => {
     preloadKenoStorySounds();
     return () => {
+      cancelSocketRef.current?.();
       roundRunIdRef.current += 1;
       clearRoundTimers();
       stopKenoStorySounds(activeSoundsRef.current);
@@ -178,7 +188,7 @@ export function useKenoSession() {
 
   const startRound = (betAmount: string, auto: boolean) => {
     const current = stateRef.current;
-    if (current.isRoundPlaying) return false;
+    if (current.isRoundPlaying || current.isPendingBet) return false;
 
     const pickedNumbers = getKenoStoryPickedNumbers(current.cells);
     if (pickedNumbers.length === 0) return false;
@@ -187,6 +197,7 @@ export function useKenoSession() {
     roundRunIdRef.current += 1;
     const runId = roundRunIdRef.current;
     clearRoundTimers();
+    cancelSocketRef.current?.();
 
     pendingRoundRef.current = {
       betAmount,
@@ -195,129 +206,169 @@ export function useKenoSession() {
       auto,
     };
 
-    patchState({ isRoundPlaying: true });
+    const runRoundWithDrawn = (drawnNumbers?: readonly number[]) => {
+      patchState({ isRoundPlaying: true, isPendingBet: false });
 
-    scheduleKenoStoryManualRound({
-      cells: current.cells,
-      pickedNumbers,
-      risk: current.risk,
-      reducedMotion: shouldReduceMotion(),
-      betAmount,
-      isActive: () => roundRunIdRef.current === runId,
-      schedule: (callback, delayMs) => {
-        const timer = window.setTimeout(callback, delayMs);
-        roundTimersRef.current.push(timer);
-      },
-      onUpdate: (patch) => {
-        if (roundRunIdRef.current !== runId) return;
+      scheduleKenoStoryManualRound({
+        cells: current.cells,
+        pickedNumbers,
+        drawnNumbers,
+        risk: current.risk,
+        reducedMotion: shouldReduceMotion(),
+        betAmount,
+        isActive: () => roundRunIdRef.current === runId,
+        schedule: (callback, delayMs) => {
+          const timer = window.setTimeout(callback, delayMs);
+          roundTimersRef.current.push(timer);
+        },
+        onUpdate: (patch) => {
+          if (roundRunIdRef.current !== runId) return;
 
-        const nextPatch: Partial<KenoSessionState> = {
-          cells: patch.cells,
-          reachedHits: patch.reachedHits,
-          showWinModal: patch.showWinModal,
-          resultAnnouncement: patch.resultAnnouncement,
-        };
+          const nextPatch: Partial<KenoSessionState> = {
+            cells: patch.cells,
+            reachedHits: patch.reachedHits,
+            showWinModal: patch.showWinModal,
+            resultAnnouncement: patch.resultAnnouncement,
+          };
 
-        if (patch.winMultiplier !== undefined) {
-          nextPatch.winMultiplier = patch.winMultiplier;
-        }
+          if (patch.winMultiplier !== undefined) {
+            nextPatch.winMultiplier = patch.winMultiplier;
+          }
 
-        if (patch.reachedHits === null) {
-          nextPatch.isRoundPlaying = false;
-        }
+          if (patch.reachedHits === null) {
+            nextPatch.isRoundPlaying = false;
+            nextPatch.isPendingBet = false;
+          }
 
-        if (patch.winMultiplier !== undefined && pendingRoundRef.current) {
-          const pending = pendingRoundRef.current;
-          pendingRoundRef.current = null;
-          const label = patch.winMultiplier.replace(/^x/i, '');
-          const multiplier = Number.parseFloat(label);
-          const isWin = Number.isFinite(multiplier) && multiplier > 0;
-          const bet = new BigNumber(pending.betAmount);
-          const payoutAmount = isWin
-            ? bet.times(Number.isFinite(multiplier) ? multiplier : 0).toFixed()
-            : '0';
+          if (patch.winMultiplier !== undefined && pendingRoundRef.current) {
+            const pending = pendingRoundRef.current;
+            pendingRoundRef.current = null;
+            const label = patch.winMultiplier.replace(/^x/i, '');
+            const multiplier = Number.parseFloat(label);
+            const isWin = Number.isFinite(multiplier) && multiplier > 0;
+            const bet = new BigNumber(pending.betAmount);
+            const payoutAmount = isWin
+              ? bet
+                  .times(Number.isFinite(multiplier) ? multiplier : 0)
+                  .toFixed()
+              : '0';
 
-          const applied = wallet.applyRound({
-            betAmount: pending.betAmount,
-            payoutAmount,
-          });
-          const latest = stateRef.current;
+            const applied = wallet.applyRound({
+              betAmount: pending.betAmount,
+              payoutAmount,
+            });
+            const latest = stateRef.current;
 
-          if (!applied) {
+            if (!applied) {
+              patchState({
+                ...nextPatch,
+                isRoundPlaying: false,
+                isPendingBet: false,
+                showWinModal: false,
+                auto: pending.auto
+                  ? { kind: 'failed', reason: 'insufficient-balance' }
+                  : latest.auto,
+              });
+              return;
+            }
+
+            let metrics = latest.metrics;
+            let nextBet = latest.betAmount;
+            let autoStatus = latest.auto;
+
+            if (pending.auto) {
+              const settled = settleAutobetRound(
+                { metrics: latest.metrics, nextBet: latest.betAmount },
+                {
+                  win: isWin,
+                  betAmount: pending.betAmount,
+                  payoutAmount,
+                },
+                {
+                  auto: true,
+                  initialBet: latest.initialBet,
+                  stopConditions: getStopConditions(latest),
+                  fiatRate: getCryptoStakeFloorRate(wallet.currencyId),
+                },
+              );
+              metrics = settled.metrics;
+              nextBet = settled.nextBet;
+
+              const canContinue = canContinueAutobet(
+                {
+                  rounds: latest.rounds,
+                  metrics,
+                  stopConditions: getStopConditions(latest),
+                },
+                getCryptoStakeFloorRate(wallet.currencyId),
+              );
+
+              if (latest.auto.kind === 'stopping') {
+                autoStatus = {
+                  kind: metrics.roundsCompleted > 0 ? 'paused' : 'idle',
+                };
+              } else if (!canContinue) {
+                autoStatus = { kind: 'idle' };
+              }
+            }
+
             patchState({
               ...nextPatch,
-              isRoundPlaying: false,
-              showWinModal: false,
-              auto: pending.auto
-                ? { kind: 'failed', reason: 'insufficient-balance' }
-                : latest.auto,
+              isPendingBet: false,
+              winAmount: formatWalletAmountLabel(
+                formatWalletAmount(
+                  payoutAmount,
+                  wallet.currencyId,
+                  wallet.displayFiat,
+                ),
+              ),
+              metrics,
+              betAmount: nextBet,
+              auto: autoStatus,
             });
             return;
           }
 
-          let metrics = latest.metrics;
-          let nextBet = latest.betAmount;
-          let autoStatus = latest.auto;
+          patchState(nextPatch);
+        },
+        onReveal: (result) => {
+          playSound(result === 'win' ? 'win' : 'lose');
+        },
+      });
+    };
 
-          if (pending.auto) {
-            const settled = settleAutobetRound(
-              { metrics: latest.metrics, nextBet: latest.betAmount },
-              {
-                win: isWin,
-                betAmount: pending.betAmount,
-                payoutAmount,
-              },
-              {
-                auto: true,
-                initialBet: latest.initialBet,
-                stopConditions: getStopConditions(latest),
-                fiatRate: getCryptoStakeFloorRate(wallet.currencyId),
-              },
+    if (socket && connected) {
+      patchState({ isRoundPlaying: true, isPendingBet: true });
+
+      cancelSocketRef.current = sendKenoBetCommand(
+        socket,
+        {
+          amount: betAmount,
+          currencyId: wallet.currencyId,
+          risk: current.risk,
+          selectedNumbers: pickedNumbers,
+        },
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            if (roundRunIdRef.current !== runId) return;
+            runRoundWithDrawn(result.drawnNumbers);
+          },
+          onError: (errorMessage) => {
+            console.warn(
+              '[Keno] Socket bet error, fallback to local:',
+              errorMessage,
             );
-            metrics = settled.metrics;
-            nextBet = settled.nextBet;
+            cancelSocketRef.current = null;
+            if (roundRunIdRef.current !== runId) return;
+            runRoundWithDrawn();
+          },
+        },
+      );
+      return true;
+    }
 
-            const canContinue = canContinueAutobet(
-              {
-                rounds: latest.rounds,
-                metrics,
-                stopConditions: getStopConditions(latest),
-              },
-              getCryptoStakeFloorRate(wallet.currencyId),
-            );
-
-            if (latest.auto.kind === 'stopping') {
-              autoStatus = {
-                kind: metrics.roundsCompleted > 0 ? 'paused' : 'idle',
-              };
-            } else if (!canContinue) {
-              autoStatus = { kind: 'idle' };
-            }
-          }
-
-          patchState({
-            ...nextPatch,
-            winAmount: formatWalletAmountLabel(
-              formatWalletAmount(
-                payoutAmount,
-                wallet.currencyId,
-                wallet.displayFiat,
-              ),
-            ),
-            metrics,
-            betAmount: nextBet,
-            auto: autoStatus,
-          });
-          return;
-        }
-
-        patchState(nextPatch);
-      },
-      onReveal: (result) => {
-        playSound(result === 'win' ? 'win' : 'lose');
-      },
-    });
-
+    runRoundWithDrawn();
     return true;
   };
 
@@ -361,7 +412,13 @@ export function useKenoSession() {
 
   const placeManualBet = () => {
     const current = stateRef.current;
-    if (current.mode !== 'manual' || current.isRoundPlaying) return;
+    if (
+      current.mode !== 'manual' ||
+      current.isRoundPlaying ||
+      current.isPendingBet
+    ) {
+      return;
+    }
     if (!new BigNumber(current.betAmount).gt(0)) return;
     if (getKenoStoryPickedNumbers(current.cells).length === 0) return;
     if (!wallet.canAfford(current.betAmount)) return;
@@ -474,7 +531,13 @@ export function useKenoSession() {
 
   const toggleCell = (number: number) => {
     const current = stateRef.current;
-    if (current.isRoundPlaying || isAutobetActive(current.auto)) return;
+    if (
+      current.isRoundPlaying ||
+      current.isPendingBet ||
+      isAutobetActive(current.auto)
+    ) {
+      return;
+    }
     const nextCells = toggleKenoStoryCell(current.cells, number);
     const didChange = nextCells.some(
       (cell, index) => cell.state !== current.cells[index]?.state,
@@ -493,7 +556,13 @@ export function useKenoSession() {
 
   const autoPick = () => {
     const current = stateRef.current;
-    if (current.isRoundPlaying || isAutobetActive(current.auto)) return;
+    if (
+      current.isRoundPlaying ||
+      current.isPendingBet ||
+      isAutobetActive(current.auto)
+    ) {
+      return;
+    }
     cancelRound();
     playSound('cell');
     applyAutobetEdit({
@@ -506,7 +575,13 @@ export function useKenoSession() {
 
   const clearTable = () => {
     const current = stateRef.current;
-    if (current.isRoundPlaying || isAutobetActive(current.auto)) return;
+    if (
+      current.isRoundPlaying ||
+      current.isPendingBet ||
+      isAutobetActive(current.auto)
+    ) {
+      return;
+    }
     cancelRound();
     applyAutobetEdit({
       cells: createKenoGridCells(),
@@ -575,10 +650,14 @@ export function useKenoSession() {
   return {
     ...state,
     wallet,
+    socketStatus,
     pickedCount,
     hasSelection,
     hasBoardState,
-    fieldsDisabled: state.isRoundPlaying || isAutobetActive(state.auto),
+    fieldsDisabled:
+      state.isRoundPlaying ||
+      state.isPendingBet ||
+      isAutobetActive(state.auto),
     placeManualBet,
     handleAutoAction,
     setMode,
