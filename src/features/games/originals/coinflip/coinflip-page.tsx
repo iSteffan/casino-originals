@@ -61,6 +61,9 @@ import { useWallet } from "#ui/features/wallet/wallet-provider";
 import { TheatreModeSync, useAppLayoutState } from "#ui/layouts/app-header/app-layout-provider";
 import { cn } from "#ui/lib/cn";
 import { Image } from "#ui/primitives/data-display/image/image";
+import { useGameSocket } from "#ui/features/games/shared/socket/game-socket";
+import { SocketStatusBadge } from "#ui/features/games/shared/socket/socket-status-badge";
+import { sendCoinflipBetCommand } from "./coinflip-socket";
 
 const COINFLIP_PAYOUT_MULTIPLIER = 2;
 const AUTOBET_CONTINUE_DELAY_MS = 300;
@@ -74,6 +77,7 @@ interface PendingFlip {
   startColor: CoinflipCoinColor;
   betAmount: string;
   auto: boolean;
+  payoutMultiplier?: number;
 }
 
 interface CoinflipPageState {
@@ -93,6 +97,7 @@ interface CoinflipPageState {
   isActiveOnLoss: boolean;
   videoSrc: CoinflipAnimationVideo;
   isVideoPlaying: boolean;
+  isPendingBet: boolean;
   lastResults: CoinflipLastResultItem[];
   resultAnnouncement?: CoinflipBoardProps["resultAnnouncement"];
   showWinModal: boolean;
@@ -148,6 +153,8 @@ function CurrencyIcon({ src, size }: { src: string; size: 20 | 32 }) {
 export function CoinflipPage() {
   const wallet = useWallet();
   const { theatreLayoutActive, theatreModeActive } = useAppLayoutState();
+  const { socket, status: socketStatus } = useGameSocket();
+
   const [state, setState] = useState<CoinflipPageState>(() => ({
     mode: "manual",
     betAmount: "0",
@@ -164,6 +171,7 @@ export function CoinflipPage() {
     isActiveOnLoss: false,
     videoSrc: COINFLIP_DEFAULT_VIDEO_SRC,
     isVideoPlaying: false,
+    isPendingBet: false,
     lastResults: [],
     showWinModal: false,
     winMultiplier: "x2.00",
@@ -174,8 +182,15 @@ export function CoinflipPage() {
   }));
 
   const pendingFlipRef = useRef<PendingFlip | null>(null);
+  const cancelSocketRef = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  useEffect(() => {
+    return () => {
+      cancelSocketRef.current?.();
+    };
+  }, []);
 
   const patchState = (patch: Partial<CoinflipPageState>) => {
     setState((current) => {
@@ -194,12 +209,13 @@ export function CoinflipPage() {
     setState(next);
   };
 
-  const startFlip = (betAmount: string, auto: boolean) => {
+  const executeFlip = (
+    landedSide: CoinflipSide,
+    betAmount: string,
+    auto: boolean,
+    payoutMultiplier = COINFLIP_PAYOUT_MULTIPLIER,
+  ) => {
     const current = stateRef.current;
-    if (current.isVideoPlaying) return false;
-    if (!wallet.canAfford(betAmount)) return false;
-
-    const landedSide: CoinflipSide = Math.random() < 0.5 ? "HEADS" : "TAILS";
     const startColor = getCoinflipStoryEndColor(current.videoSrc);
     pendingFlipRef.current = {
       pickedSide: current.side,
@@ -207,6 +223,7 @@ export function CoinflipPage() {
       startColor,
       betAmount,
       auto,
+      payoutMultiplier,
     };
     patchState({
       videoSrc: getCoinflipVideoSrc({
@@ -214,10 +231,56 @@ export function CoinflipPage() {
         endColor: getCoinflipEndColorFromSide(landedSide),
       }),
       isVideoPlaying: true,
+      isPendingBet: false,
       resultAnnouncement: undefined,
       showWinModal: false,
     });
     return true;
+  };
+
+  const triggerFlip = (betAmount: string, auto: boolean) => {
+    const current = stateRef.current;
+    if (current.isVideoPlaying || current.isPendingBet) return false;
+    if (!wallet.canAfford(betAmount)) return false;
+
+    if (socketStatus === "connected" && socket) {
+      patchState({ isPendingBet: true });
+      cancelSocketRef.current?.();
+
+      cancelSocketRef.current = sendCoinflipBetCommand(
+        socket,
+        {
+          amount: betAmount,
+          currencyId: wallet.currencyId,
+          side: current.side,
+        },
+        {
+          onResult: (result) => {
+            cancelSocketRef.current = null;
+            executeFlip(
+              result.landedSide,
+              betAmount,
+              auto,
+              result.payoutMultiplier,
+            );
+          },
+          onError: (errMsg) => {
+            console.warn(
+              "[Coinflip] Socket bet failed, falling back to local RNG:",
+              errMsg,
+            );
+            cancelSocketRef.current = null;
+            const landedSide: CoinflipSide =
+              Math.random() < 0.5 ? "HEADS" : "TAILS";
+            executeFlip(landedSide, betAmount, auto);
+          },
+        },
+      );
+      return true;
+    }
+
+    const landedSide: CoinflipSide = Math.random() < 0.5 ? "HEADS" : "TAILS";
+    return executeFlip(landedSide, betAmount, auto);
   };
 
   const runAutoRound = useEffectEvent(() => {
@@ -242,6 +305,7 @@ export function CoinflipPage() {
     }
 
     if (current.auto.kind !== "running") return;
+    if (current.isVideoPlaying || current.isPendingBet) return;
 
     if (!wallet.canAfford(current.betAmount)) {
       patchState({
@@ -250,7 +314,7 @@ export function CoinflipPage() {
       return;
     }
 
-    startFlip(current.betAmount, true);
+    triggerFlip(current.betAmount, true);
   });
 
   const handleVideoEnd = () => {
@@ -259,21 +323,28 @@ export function CoinflipPage() {
     const current = stateRef.current;
 
     if (!pendingFlip) {
-      patchState({ isVideoPlaying: false });
+      patchState({ isVideoPlaying: false, isPendingBet: false });
       return;
     }
 
-    const { pickedSide, landedSide, betAmount, auto } = pendingFlip;
+    const {
+      pickedSide,
+      landedSide,
+      betAmount,
+      auto,
+      payoutMultiplier = COINFLIP_PAYOUT_MULTIPLIER,
+    } = pendingFlip;
     const isWin = landedSide === pickedSide;
     const bet = new BigNumber(betAmount);
     const payoutAmount = isWin
-      ? bet.times(COINFLIP_PAYOUT_MULTIPLIER).toFixed()
+      ? bet.times(payoutMultiplier).toFixed()
       : "0";
 
     const applied = wallet.applyRound({ betAmount, payoutAmount });
     if (!applied) {
       patchState({
         isVideoPlaying: false,
+        isPendingBet: false,
         videoSrc: getCoinflipIdleVideoSrc(
           getCoinflipEndColorFromSide(landedSide),
         ),
@@ -328,6 +399,7 @@ export function CoinflipPage() {
         getCoinflipEndColorFromSide(landedSide),
       ),
       isVideoPlaying: false,
+      isPendingBet: false,
       lastResults: [result, ...current.lastResults].slice(0, 40),
       resultAnnouncement: isWin
         ? undefined
@@ -336,7 +408,7 @@ export function CoinflipPage() {
             message: landedSide === "HEADS" ? "Heads." : "Tails.",
           },
       showWinModal: isWin,
-      winMultiplier: `x${COINFLIP_PAYOUT_MULTIPLIER.toFixed(2)}`,
+      winMultiplier: `x${payoutMultiplier.toFixed(2)}`,
       winAmount: winLabel,
       metrics,
       betAmount: nextBet,
@@ -345,6 +417,8 @@ export function CoinflipPage() {
   };
 
   const handlePlaybackError = () => {
+    cancelSocketRef.current?.();
+    cancelSocketRef.current = null;
     const startColor =
       pendingFlipRef.current?.startColor ??
       getCoinflipStoryStartColor(state.videoSrc);
@@ -353,6 +427,7 @@ export function CoinflipPage() {
     patchState({
       videoSrc: getCoinflipIdleVideoSrc(startColor),
       isVideoPlaying: false,
+      isPendingBet: false,
       auto: wasAuto
         ? { kind: "failed", reason: "generic" }
         : stateRef.current.auto,
@@ -361,10 +436,16 @@ export function CoinflipPage() {
 
   const placeManualBet = () => {
     const current = stateRef.current;
-    if (current.mode !== "manual" || current.isVideoPlaying) return;
+    if (
+      current.mode !== "manual" ||
+      current.isVideoPlaying ||
+      current.isPendingBet
+    ) {
+      return;
+    }
     if (!new BigNumber(current.betAmount).gt(0)) return;
     if (!wallet.canAfford(current.betAmount)) return;
-    startFlip(current.betAmount, false);
+    triggerFlip(current.betAmount, false);
   };
 
   const startAutoBet = () => {
@@ -442,13 +523,24 @@ export function CoinflipPage() {
 
   const continueAfterPresentation = useEffectEvent(runAutoRound);
   useEffect(() => {
-    if (!isAutobetActive(state.auto) || state.isVideoPlaying) return undefined;
+    if (
+      !isAutobetActive(state.auto) ||
+      state.isVideoPlaying ||
+      state.isPendingBet
+    ) {
+      return undefined;
+    }
     const timer = window.setTimeout(
       continueAfterPresentation,
       AUTOBET_CONTINUE_DELAY_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [state.auto, state.isVideoPlaying, state.metrics.roundsCompleted]);
+  }, [
+    state.auto,
+    state.isVideoPlaying,
+    state.isPendingBet,
+    state.metrics.roundsCompleted,
+  ]);
 
   useEffect(() => {
     if (!state.showWinModal) return undefined;
@@ -546,7 +638,8 @@ export function CoinflipPage() {
     roundsCompleted: state.metrics.roundsCompleted,
   });
 
-  const fieldsDisabled = state.isVideoPlaying || isAutobetActive(state.auto);
+  const fieldsDisabled =
+    state.isVideoPlaying || state.isPendingBet || isAutobetActive(state.auto);
   const sessionState = mapAutobetSessionState(state.auto, state.metrics);
 
   const config = {
@@ -585,11 +678,12 @@ export function CoinflipPage() {
       manualActionLabel: "Place Bet",
       autoActionLabel: autobetAction.label,
       autoActionVariant: autobetAction.variant,
-      manualActionDisabled: !hasStake || exceedsWallet,
-      manualActionPending: state.isVideoPlaying,
+      manualActionDisabled: !hasStake || exceedsWallet || state.isPendingBet,
+      manualActionPending: state.isVideoPlaying || state.isPendingBet,
       autoActionDisabled:
         state.auto.kind === "stopping" ||
-        (state.isVideoPlaying && autobetAction.variant !== "stop") ||
+        ((state.isVideoPlaying || state.isPendingBet) &&
+          autobetAction.variant !== "stop") ||
         (autobetAction.variant === "start" &&
           (!hasStake || exceedsWallet || maxRounds <= 0)),
       theatreMode: theatreLayoutActive,
@@ -720,6 +814,7 @@ export function CoinflipPage() {
         >
           <GameHeader
             title="Coinflip"
+            modeControl={<SocketStatusBadge status={socketStatus} />}
             onBackClick={() => undefined}
             showVolumeControl
             volume={state.volume}

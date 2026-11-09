@@ -254,6 +254,24 @@ function drawKenoNumbers(drawCount = 10, totalCount = 40): number[] {
   return numbers.slice(0, drawCount);
 }
 
+export interface CoinflipBetPayload {
+  amount: string;
+  currencyId?: string;
+  side: 'HEADS' | 'TAILS';
+  clientSeed?: string;
+}
+
+export interface CoinflipBetResult {
+  side: 'HEADS' | 'TAILS';
+  landedSide: 'HEADS' | 'TAILS';
+  isWin: boolean;
+  payoutMultiplier: number;
+  betAmount: string;
+  payoutAmount: string;
+}
+
+const COINFLIP_MULTIPLIER = 2;
+
 // Create HTTP server for health checks (useful for Render/Koyeb keep-alive)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -271,7 +289,7 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         status: 'ok',
         service: 'casino-originals-ws-server',
-        games: ['dice', 'mines'],
+        games: ['dice', 'mines', 'towers', 'keno', 'coinflip'],
         timestamp: new Date().toISOString(),
       }),
     );
@@ -1176,6 +1194,82 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('keno:bet', handleKenoBet);
   socket.on('keno:play', handleKenoBet);
+
+  const handleCoinflipBet = (
+    payload: CoinflipBetPayload,
+    meta?: RequestMeta,
+  ) => {
+    try {
+      const { amount, currencyId = 'btc', side, clientSeed } = payload ?? {};
+      const validSide = side?.toUpperCase?.() as 'HEADS' | 'TAILS';
+      if (validSide !== 'HEADS' && validSide !== 'TAILS') {
+        socket.emit(
+          'exception',
+          { message: "Side must be either 'HEADS' or 'TAILS'." },
+          meta,
+        );
+        return;
+      }
+
+      const betBig = new BigNumber(amount);
+      if (!betBig.isFinite() || betBig.lte(0)) {
+        socket.emit(
+          'exception',
+          { message: 'Amount must be a positive number.' },
+          meta,
+        );
+        return;
+      }
+
+      let landedSide: 'HEADS' | 'TAILS';
+      if (clientSeed) {
+        const serverSeed = crypto.randomBytes(32).toString('hex');
+        const hash = crypto
+          .createHmac('sha256', serverSeed)
+          .update(`${clientSeed}:${Date.now()}:${socket.id}`)
+          .digest('hex');
+        const byte = parseInt(hash.substring(0, 2), 16);
+        landedSide = byte % 2 === 0 ? 'HEADS' : 'TAILS';
+      } else {
+        landedSide = crypto.randomInt(0, 2) === 0 ? 'HEADS' : 'TAILS';
+      }
+
+      const isWin = landedSide === validSide;
+      const payoutMultiplier = isWin ? COINFLIP_MULTIPLIER : 0;
+      const payoutAmount = isWin ? betBig.times(COINFLIP_MULTIPLIER).toFixed() : '0';
+
+      console.log(
+        `[Coinflip:Bet] ${socket.id} picked ${validSide} -> Landed: ${landedSide} (${isWin ? 'WIN' : 'LOSE'}), Mult: ${payoutMultiplier}x, Payout: ${payoutAmount} ${currencyId}`,
+      );
+
+      socket.emit(
+        'coinflip:result',
+        {
+          side: validSide,
+          landedSide,
+          isWin,
+          payoutMultiplier,
+          betAmount: betBig.toFixed(),
+          payoutAmount,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Coinflip:Bet] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error ? err.message : 'Error processing Coinflip bet.',
+        },
+        meta,
+      );
+    }
+  };
+
+  socket.on('coinflip:bet', handleCoinflipBet);
+  socket.on('coinflip:flip', handleCoinflipBet);
+  socket.on('coinflip:play', handleCoinflipBet);
 
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);
