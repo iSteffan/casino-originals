@@ -25,6 +25,7 @@ import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 function CurrencyIcon({ src, size }: { src: string; size: 20 | 32 }) {
   return (
@@ -171,6 +172,7 @@ export function usePlinkoOriginalsController(session: PlinkoSession): PlinkoOrig
     board,
     header: {
       title: plinkoStoryLabels.title,
+      modeControl: <SocketStatusBadge status={session.socketStatus} />,
       volume: session.volume,
       isTheatreMode: session.theatreMode,
       onVolumeChange: session.setVolume,

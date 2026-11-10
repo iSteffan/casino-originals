@@ -272,6 +272,103 @@ export interface CoinflipBetResult {
 
 const COINFLIP_MULTIPLIER = 2;
 
+export interface PlinkoBetPayload {
+  amount: string;
+  currencyId?: string;
+  risk?: 'low' | 'medium' | 'high';
+  rows?: number;
+  clientSeed?: string;
+}
+
+export interface PlinkoBetResult {
+  bucketIndex: number;
+  multiplier: number;
+  payoutAmount: string;
+  betAmount: string;
+  isWin: boolean;
+  risk: 'low' | 'medium' | 'high';
+  rows: number;
+}
+
+const PLINKO_MULTIPLIERS: Record<string, Record<'low' | 'medium' | 'high', readonly number[]>> = {
+  '8': {
+    low: [5.2, 2.1, 1.0, 1.0, 0.5, 1.0, 1.0, 2.1, 5.2],
+    medium: [13.0, 2.8, 1.3, 0.7, 0.4, 0.7, 1.3, 2.8, 13.0],
+    high: [30.0, 3.7, 1.3, 0.4, 0.2, 0.4, 1.3, 3.7, 30.0],
+  },
+  '9': {
+    low: [6.0, 2.0, 1.5, 1.1, 0.6, 0.6, 1.1, 1.5, 2.0, 6.0],
+    medium: [20.0, 5.0, 1.5, 0.8, 0.5, 0.5, 0.8, 1.5, 5.0, 20.0],
+    high: [40.0, 7.0, 2.0, 0.6, 0.2, 0.2, 0.6, 2.0, 7.0, 40.0],
+  },
+  '10': {
+    low: [8.9, 3.0, 1.6, 1.1, 0.9, 0.5, 0.9, 1.1, 1.6, 3.0, 8.9],
+    medium: [22.0, 5.3, 2.0, 1.4, 0.6, 0.3, 0.6, 1.4, 2.0, 5.3, 22.0],
+    high: [75.0, 9.9, 3.2, 0.8, 0.3, 0.2, 0.3, 0.8, 3.2, 9.9, 75.0],
+  },
+  '11': {
+    low: [10.0, 3.0, 2.3, 1.2, 0.9, 0.7, 0.7, 0.9, 1.2, 2.3, 3.0, 10.0],
+    medium: [28.0, 5.8, 2.6, 1.8, 0.7, 0.5, 0.5, 0.7, 1.8, 2.6, 5.8, 28.0],
+    high: [125.0, 13.0, 5.4, 1.5, 0.3, 0.2, 0.2, 0.3, 1.5, 5.4, 13.0, 125.0],
+  },
+  '12': {
+    low: [10.0, 4.0, 2.8, 1.3, 1.0, 0.9, 0.5, 0.9, 1.0, 1.3, 2.8, 4.0, 10.0],
+    medium: [33.0, 10.0, 4.0, 2.0, 1.2, 0.5, 0.3, 0.5, 1.2, 2.0, 4.0, 10.0, 33.0],
+    high: [180.0, 20.0, 7.6, 2.0, 0.8, 0.2, 0.2, 0.2, 0.8, 2.0, 7.6, 20.0, 180.0],
+  },
+  '13': {
+    low: [11.0, 4.5, 3.3, 2.0, 1.2, 0.9, 0.6, 0.6, 0.9, 1.2, 2.0, 3.3, 4.5, 11.0],
+    medium: [40.0, 14.0, 5.0, 2.9, 1.5, 0.6, 0.4, 0.4, 0.6, 1.5, 2.9, 5.0, 14.0, 40.0],
+    high: [260.0, 39.0, 11.0, 4.0, 0.9, 0.2, 0.2, 0.2, 0.2, 0.9, 4.0, 11.0, 39.0, 260.0],
+  },
+  '14': {
+    low: [12.0, 5.0, 2.4, 1.8, 1.2, 1.0, 0.9, 0.6, 0.9, 1.0, 1.2, 1.8, 2.4, 5.0, 12.0],
+    medium: [60.0, 17.0, 7.0, 4.1, 1.2, 0.7, 0.3, 0.3, 0.7, 1.2, 2.0, 4.1, 7.0, 17.0, 60.0],
+    high: [420.0, 52.0, 20.0, 4.0, 2.0, 0.3, 0.2, 0.2, 0.2, 0.3, 2.0, 4.0, 20.0, 52.0, 420.0],
+  },
+  '15': {
+    low: [14.0, 10.0, 3.0, 2.0, 1.5, 1.1, 0.9, 0.7, 0.7, 0.9, 1.1, 1.5, 2.0, 3.0, 10.0, 14.0],
+    medium: [
+      90.0, 17.0, 10.0, 4.1, 3.1, 1.1, 0.5, 0.4, 0.4, 0.5, 1.1, 3.1, 4.1, 10.0, 17.0, 90.0,
+    ],
+    high: [
+      620.0, 85.0, 25.0, 8.0, 3.0, 0.5, 0.2, 0.2, 0.2, 0.2, 0.5, 3.0, 8.0, 25.0, 85.0, 620.0,
+    ],
+  },
+  '16': {
+    low: [
+      20.0, 12.0, 6.5, 2.0, 1.3, 1.1, 1.1, 0.9, 0.5, 0.9, 1.1, 1.1, 1.3, 2.0, 6.5, 12.0, 20.0,
+    ],
+    medium: [
+      120.0, 41.0, 9.5, 4.9, 2.7, 1.5, 1.0, 0.5, 0.3, 0.5, 1.0, 1.5, 2.7, 4.9, 9.5, 41.0, 120.0,
+    ],
+    high: [
+      1000.0, 140.0, 27.0, 8.0, 4.0, 2.0, 0.2, 0.2, 0.2, 0.2, 0.2, 2.0, 4.0, 8.0, 27.0, 140.0,
+      1000.0,
+    ],
+  },
+};
+
+function rollServerPlinkoBucket(rows: number, clientSeed?: string): number {
+  let bucket = 0;
+  if (clientSeed) {
+    const serverSeed = crypto.randomBytes(32).toString('hex');
+    const hash = crypto
+      .createHmac('sha256', serverSeed)
+      .update(`${clientSeed}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`)
+      .digest('hex');
+    for (let r = 0; r < rows; r += 1) {
+      const byte = parseInt(hash.substring((r * 2) % 62, (r * 2) % 62 + 2), 16);
+      if (byte % 2 === 1) bucket += 1;
+    }
+  } else {
+    for (let r = 0; r < rows; r += 1) {
+      if (crypto.randomInt(0, 2) === 1) bucket += 1;
+    }
+  }
+  return bucket;
+}
+
 // Create HTTP server for health checks (useful for Render/Koyeb keep-alive)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -289,7 +386,7 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         status: 'ok',
         service: 'casino-originals-ws-server',
-        games: ['dice', 'mines', 'towers', 'keno', 'coinflip'],
+        games: ['dice', 'mines', 'towers', 'keno', 'coinflip', 'plinko'],
         timestamp: new Date().toISOString(),
       }),
     );
@@ -1270,6 +1367,82 @@ io.on('connection', (socket: Socket) => {
   socket.on('coinflip:bet', handleCoinflipBet);
   socket.on('coinflip:flip', handleCoinflipBet);
   socket.on('coinflip:play', handleCoinflipBet);
+
+  const handlePlinkoBet = (
+    payload: PlinkoBetPayload,
+    meta?: RequestMeta,
+  ) => {
+    try {
+      const {
+        amount,
+        currencyId = 'btc',
+        risk = 'medium',
+        rows = 16,
+        clientSeed,
+      } = payload ?? {};
+
+      const validRisk: 'low' | 'medium' | 'high' =
+        risk === 'low' || risk === 'medium' || risk === 'high' ? risk : 'medium';
+      const validRows = typeof rows === 'number' && rows >= 8 && rows <= 16 ? Math.round(rows) : 16;
+
+      const betBig = new BigNumber(amount);
+      if (!betBig.isFinite() || betBig.lte(0)) {
+        socket.emit(
+          'exception',
+          { message: 'Amount must be a positive number.' },
+          meta,
+        );
+        return;
+      }
+
+      const paytable = PLINKO_MULTIPLIERS[String(validRows)]?.[validRisk];
+      if (!paytable) {
+        socket.emit(
+          'exception',
+          { message: `Invalid plinko configuration: rows ${validRows}, risk ${validRisk}` },
+          meta,
+        );
+        return;
+      }
+
+      const bucketIndex = rollServerPlinkoBucket(validRows, clientSeed);
+      const multiplier = paytable[bucketIndex] ?? 0;
+      const payoutAmount = betBig.times(multiplier).toFixed();
+      const isWin = multiplier >= 1;
+
+      console.log(
+        `[Plinko:Bet] ${socket.id} (rows: ${validRows}, risk: ${validRisk}) -> Bucket: ${bucketIndex}/${validRows}, Mult: ${multiplier}x, Payout: ${payoutAmount} ${currencyId}`,
+      );
+
+      socket.emit(
+        'plinko:result',
+        {
+          bucketIndex,
+          multiplier,
+          payoutAmount,
+          betAmount: betBig.toFixed(),
+          isWin,
+          risk: validRisk,
+          rows: validRows,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Plinko:Bet] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error ? err.message : 'Error processing Plinko bet.',
+        },
+        meta,
+      );
+    }
+  };
+
+  socket.on('plinko:bet', handlePlinkoBet);
+  socket.on('plinko:drop', handlePlinkoBet);
+  socket.on('plinko:play', handlePlinkoBet);
 
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);

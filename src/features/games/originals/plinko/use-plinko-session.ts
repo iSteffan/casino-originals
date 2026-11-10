@@ -39,6 +39,8 @@ import {
   WALLET_CRYPTO_FRACTION_DIGITS,
 } from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
+import { sendPlinkoBetCommand } from './plinko-socket';
 
 /** One accepted bet whose ball is still in flight (betstrike `PlinkoDrop`). */
 export interface PlinkoSessionDrop {
@@ -92,10 +94,13 @@ function canAffordPlinkoDrop(
   wallet: Pick<ReturnType<typeof useWallet>, 'canAfford'>,
   drops: readonly PlinkoSessionDrop[],
   betAmount: string,
+  pendingStakeTotal: BigNumber = new BigNumber(0),
 ): boolean {
   const stake = new BigNumber(betAmount);
   if (!stake.isFinite() || !stake.gt(0)) return false;
-  return wallet.canAfford(sumPendingStake(drops).plus(stake).toFixed());
+  return wallet.canAfford(
+    sumPendingStake(drops).plus(pendingStakeTotal).plus(stake).toFixed(),
+  );
 }
 
 /**
@@ -142,6 +147,10 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
   const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
   const volumeRef = useRef(state.volume);
 
+  const { socket, status: socketStatus } = useGameSocket();
+  const pendingDropCancelRefs = useRef<Map<string, () => void>>(new Map());
+  const pendingStakesRef = useRef<Map<string, BigNumber>>(new Map());
+
   // Handlers read the latest wallet/settings from refs (synced after each render).
   useLayoutEffect(() => {
     walletRef.current = wallet;
@@ -168,6 +177,11 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
     const activeSounds = activeSoundsRef.current;
     return () => {
       stopPlinkoSounds(activeSounds);
+      for (const cancel of pendingDropCancelRefs.current.values()) {
+        cancel();
+      }
+      pendingDropCancelRefs.current.clear();
+      pendingStakesRef.current.clear();
     };
   }, []);
 
@@ -175,8 +189,18 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
     setPlinkoSoundsVolume(activeSoundsRef.current, state.volume);
   }, [state.volume]);
 
+  const getPendingSocketStake = (): BigNumber => {
+    let sum = new BigNumber(0);
+    for (const stake of pendingStakesRef.current.values()) {
+      sum = sum.plus(stake);
+    }
+    return sum;
+  };
+
   const isBusy = (current: PlinkoSessionState) =>
-    current.drops.length > 0 || isAutobetActive(current.auto);
+    current.drops.length > 0 ||
+    pendingDropCancelRefs.current.size > 0 ||
+    isAutobetActive(current.auto);
 
   /** Settings edits are blocked while balls are in flight (betstrike `changeSettings`). */
   const applySettingsEdit = (patch: Partial<PlinkoSessionState>) => {
@@ -187,35 +211,37 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
   };
 
   const canAffordNextDrop = (current: PlinkoSessionState, betAmount: string) =>
-    canAffordPlinkoDrop(walletRef.current, current.drops, betAmount);
+    canAffordPlinkoDrop(
+      walletRef.current,
+      current.drops,
+      betAmount,
+      getPendingSocketStake(),
+    );
 
-  const dropBall = (auto: boolean): boolean => {
+  const executeDrop = (
+    bucketIndex: number,
+    multiplier: number,
+    payoutAmount: string,
+    isWin: boolean,
+    betAmount: string,
+    auto: boolean,
+  ): boolean => {
     const current = stateRef.current;
-    const { betAmount } = current;
-    if (!canAffordNextDrop(current, betAmount)) return false;
-
-    const table = resolvePlinkoTable({ risk: current.risk, rows: current.rows });
-    if (!table.rows || table.multipliers.length === 0) return false;
-
-    const bucketIndex = rollPlinkoBucket(table.rows);
-    const settlement = settlePlinkoDrop(bucketIndex, table.multipliers, betAmount);
     dropSeqRef.current += 1;
     const drop: PlinkoSessionDrop = {
       id: `plinko-drop-${dropSeqRef.current}`,
       bucketIndex,
-      multiplier: settlement.multiplier,
+      multiplier,
       betAmount,
-      payoutAmount: settlement.payoutAmount,
+      payoutAmount,
     };
 
     let metrics = current.metrics;
     let autoStatus = current.auto;
     if (auto) {
-      // Betstrike settles autobet metrics when the round result is accepted,
-      // before the ball presentation finishes.
       metrics = settleAutobetRound(
         { metrics: current.metrics, nextBet: betAmount },
-        { win: settlement.win, betAmount, payoutAmount: settlement.payoutAmount },
+        { win: isWin, betAmount, payoutAmount },
         {
           auto: true,
           initialBet: current.initialBet,
@@ -236,6 +262,73 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
     commit({ drops: [...current.drops, drop], metrics, auto: autoStatus });
     playSound('drop');
     return true;
+  };
+
+  const dropBall = (auto: boolean): boolean => {
+    const current = stateRef.current;
+    const { betAmount } = current;
+    if (!canAffordNextDrop(current, betAmount)) return false;
+
+    const table = resolvePlinkoTable({ risk: current.risk, rows: current.rows });
+    if (!table.rows || table.multipliers.length === 0) return false;
+
+    if (socketStatus === 'connected' && socket) {
+      const dropReqId = `plinko_req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      pendingStakesRef.current.set(dropReqId, new BigNumber(betAmount));
+
+      const cancel = sendPlinkoBetCommand(
+        socket,
+        {
+          amount: betAmount,
+          currencyId: walletRef.current.currencyId,
+          risk: current.risk as 'low' | 'medium' | 'high',
+          rows: table.rows,
+        },
+        {
+          onResult: (result) => {
+            pendingDropCancelRefs.current.delete(dropReqId);
+            pendingStakesRef.current.delete(dropReqId);
+            executeDrop(
+              result.bucketIndex,
+              result.multiplier,
+              result.payoutAmount,
+              result.isWin,
+              betAmount,
+              auto,
+            );
+          },
+          onError: (errMsg) => {
+            console.warn('[Plinko] Socket bet failed, falling back to local RNG:', errMsg);
+            pendingDropCancelRefs.current.delete(dropReqId);
+            pendingStakesRef.current.delete(dropReqId);
+            const bucketIndex = rollPlinkoBucket(table.rows!);
+            const settlement = settlePlinkoDrop(bucketIndex, table.multipliers, betAmount);
+            executeDrop(
+              bucketIndex,
+              settlement.multiplier,
+              settlement.payoutAmount,
+              settlement.win,
+              betAmount,
+              auto,
+            );
+          },
+        },
+      );
+
+      pendingDropCancelRefs.current.set(dropReqId, cancel);
+      return true;
+    }
+
+    const bucketIndex = rollPlinkoBucket(table.rows);
+    const settlement = settlePlinkoDrop(bucketIndex, table.multipliers, betAmount);
+    return executeDrop(
+      bucketIndex,
+      settlement.multiplier,
+      settlement.payoutAmount,
+      settlement.win,
+      betAmount,
+      auto,
+    );
   };
 
   const onBallLand = (event: PlinkoBallLandEvent) => {
@@ -453,14 +546,15 @@ export function usePlinkoSession(options: UsePlinkoSessionOptions = {}) {
 
   return {
     ...state,
+    socketStatus,
     wallet,
     configurations: PLINKO_CONFIGURATIONS,
     rowsOptions: table.rowsOptions,
     multipliers: table.multipliers,
     pendingStake,
     hasStake,
-    /** Enough balance for one more ball on top of every ball still in flight. */
-    canDropBall: canAffordPlinkoDrop(wallet, state.drops, state.betAmount),
+    /** Enough balance for one more ball on top of every ball still in flight or pending. */
+    canDropBall: canAffordNextDrop(state, state.betAmount),
     reducedMotion,
     fieldsDisabled: isBusy(state),
     placeManualBet,
