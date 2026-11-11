@@ -28,6 +28,7 @@ import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 function CurrencyIcon({ src, size }: { src: string; size: 20 | 32 }) {
   return (
@@ -101,6 +102,7 @@ export function useDoubleOriginalsController(session: DoubleSession): DoubleOrig
       autoActionLabel: autobetAction.label,
       autoActionVariant: autobetAction.variant,
       manualActionDisabled: !session.canPlaceBet,
+      manualActionPending: session.isPendingBet,
       autoActionDisabled:
         session.auto.kind === 'stopping' ||
         (autobetAction.variant === 'start' &&
@@ -184,6 +186,7 @@ export function useDoubleOriginalsController(session: DoubleSession): DoubleOrig
     winOverlay,
     header: {
       title: doubleStoryLabels.title,
+      modeControl: <SocketStatusBadge status={session.socketStatus} />,
       volume: session.volume,
       isTheatreMode: session.theatreMode,
       onVolumeChange: session.setVolume,

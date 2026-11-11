@@ -386,7 +386,7 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         status: 'ok',
         service: 'casino-originals-ws-server',
-        games: ['dice', 'mines', 'towers', 'keno', 'coinflip', 'plinko'],
+        games: ['dice', 'mines', 'towers', 'keno', 'coinflip', 'plinko', 'double'],
         timestamp: new Date().toISOString(),
       }),
     );
@@ -406,6 +406,186 @@ const io = new Server(server, {
   pingInterval: 10000,
   pingTimeout: 5000,
 });
+
+export type DoubleColor = 'RED' | 'BLACK' | 'GREEN';
+export type DoubleBetType = DoubleColor | 'JOKER';
+export type DoublePhase = 'BETTING' | 'LOCKED' | 'RESOLVING' | 'FINISHED';
+
+export interface DoubleBetPayload {
+  amount: string;
+  currencyId?: string;
+  types: DoubleBetType[];
+  roundId?: number;
+}
+
+interface DoubleOutcome {
+  color: DoubleColor;
+  hasJoker: boolean;
+}
+
+interface ServerDoubleHistoryItem extends DoubleOutcome {
+  id: string;
+}
+
+interface DoubleRoundBetEntry {
+  socketId: string;
+  currencyId: string;
+  bets: { type: DoubleBetType; amount: string }[];
+  totalStake: string;
+}
+
+const DOUBLE_ROOM = 'game:double';
+const DOUBLE_MAX_COLOR_PICKS = 2;
+
+const DOUBLE_TILES: readonly { name: string; color: DoubleColor; hasJoker: boolean }[] = [
+  { name: 'green', color: 'GREEN', hasJoker: false },
+  { name: 'red', color: 'RED', hasJoker: false },
+  { name: 'black-joker', color: 'BLACK', hasJoker: true },
+  { name: 'red', color: 'RED', hasJoker: false },
+  { name: 'black', color: 'BLACK', hasJoker: false },
+  { name: 'red', color: 'RED', hasJoker: false },
+  { name: 'black', color: 'BLACK', hasJoker: false },
+  { name: 'green-joker', color: 'GREEN', hasJoker: true },
+  { name: 'black', color: 'BLACK', hasJoker: false },
+  { name: 'red', color: 'RED', hasJoker: false },
+  { name: 'black', color: 'BLACK', hasJoker: false },
+  { name: 'red-joker', color: 'RED', hasJoker: true },
+  { name: 'black', color: 'BLACK', hasJoker: false },
+  { name: 'red', color: 'RED', hasJoker: false },
+];
+
+const DOUBLE_PAYOUT_MULTIPLIERS: Record<DoubleBetType, number> = {
+  RED: 2,
+  BLACK: 2,
+  GREEN: 14,
+  JOKER: 7,
+};
+
+const DOUBLE_PHASE_DURATION_MS: Record<DoublePhase, number> = {
+  BETTING: 5_000,
+  LOCKED: 1_000,
+  RESOLVING: 10_000,
+  FINISHED: 3_000,
+};
+
+const serverDoubleState = {
+  roundId: 1,
+  phase: 'BETTING' as DoublePhase,
+  phaseEndsAt: Date.now() + DOUBLE_PHASE_DURATION_MS.BETTING,
+  tileIndex: 0,
+  history: [] as ServerDoubleHistoryItem[],
+  roundBets: new Map<string, DoubleRoundBetEntry>(),
+};
+
+function advanceDoubleServerPhase() {
+  const now = Date.now();
+  const prevPhase = serverDoubleState.phase;
+
+  if (prevPhase === 'BETTING') {
+    serverDoubleState.phase = 'LOCKED';
+    serverDoubleState.phaseEndsAt = now + DOUBLE_PHASE_DURATION_MS.LOCKED;
+
+    io.to(DOUBLE_ROOM).emit('double:phase', {
+      roundId: serverDoubleState.roundId,
+      phase: 'LOCKED',
+      durationMs: DOUBLE_PHASE_DURATION_MS.LOCKED,
+      remainingMs: DOUBLE_PHASE_DURATION_MS.LOCKED,
+      tileIndex: serverDoubleState.tileIndex,
+    });
+  } else if (prevPhase === 'LOCKED') {
+    const rolledIndex = crypto.randomInt(0, DOUBLE_TILES.length);
+    serverDoubleState.phase = 'RESOLVING';
+    serverDoubleState.tileIndex = rolledIndex;
+    serverDoubleState.phaseEndsAt = now + DOUBLE_PHASE_DURATION_MS.RESOLVING;
+
+    const tile = DOUBLE_TILES[rolledIndex]!;
+    console.log(
+      `[Double:Roll] Round #${serverDoubleState.roundId} -> slot ${rolledIndex} (${tile.name})`,
+    );
+
+    io.to(DOUBLE_ROOM).emit('double:phase', {
+      roundId: serverDoubleState.roundId,
+      phase: 'RESOLVING',
+      durationMs: DOUBLE_PHASE_DURATION_MS.RESOLVING,
+      remainingMs: DOUBLE_PHASE_DURATION_MS.RESOLVING,
+      tileIndex: rolledIndex,
+      outcome: { color: tile.color, hasJoker: tile.hasJoker },
+    });
+  } else if (prevPhase === 'RESOLVING') {
+    const tile = DOUBLE_TILES[serverDoubleState.tileIndex]!;
+    const outcome: DoubleOutcome = { color: tile.color, hasJoker: tile.hasJoker };
+    const historyItem: ServerDoubleHistoryItem = {
+      id: `double-roll-${serverDoubleState.roundId}`,
+      ...outcome,
+    };
+
+    serverDoubleState.phase = 'FINISHED';
+    serverDoubleState.phaseEndsAt = now + DOUBLE_PHASE_DURATION_MS.FINISHED;
+    serverDoubleState.history = [historyItem, ...serverDoubleState.history].slice(0, 100);
+
+    // Emit individual payouts BEFORE broadcasting FINISHED phase so clients have the result ready
+    for (const [socketId, entry] of serverDoubleState.roundBets.entries()) {
+      let payoutAmount = new BigNumber(0);
+      const winningTypes: DoubleBetType[] = [];
+      for (const bet of entry.bets) {
+        const isWin =
+          bet.type === 'JOKER' ? outcome.hasJoker : outcome.color === bet.type;
+        if (isWin) {
+          winningTypes.push(bet.type);
+          payoutAmount = payoutAmount.plus(
+            new BigNumber(bet.amount).times(DOUBLE_PAYOUT_MULTIPLIERS[bet.type]),
+          );
+        }
+      }
+
+      const payoutStr = payoutAmount.toFixed();
+      const isWin = payoutAmount.gt(0);
+
+      console.log(
+        `[Double:Settle] ${socketId} round #${serverDoubleState.roundId} -> ${isWin ? `WIN ${payoutStr}` : 'LOSE'} ${entry.currencyId}`,
+      );
+
+      io.to(socketId).emit('double:result', {
+        roundId: serverDoubleState.roundId,
+        tileIndex: serverDoubleState.tileIndex,
+        outcome,
+        betAmount: entry.totalStake,
+        payoutAmount: payoutStr,
+        winningTypes,
+        isWin,
+        currencyId: entry.currencyId,
+      });
+    }
+
+    io.to(DOUBLE_ROOM).emit('double:phase', {
+      roundId: serverDoubleState.roundId,
+      phase: 'FINISHED',
+      durationMs: DOUBLE_PHASE_DURATION_MS.FINISHED,
+      remainingMs: DOUBLE_PHASE_DURATION_MS.FINISHED,
+      tileIndex: serverDoubleState.tileIndex,
+      outcome,
+      historyItem,
+    });
+  } else {
+    serverDoubleState.roundId += 1;
+    serverDoubleState.phase = 'BETTING';
+    serverDoubleState.phaseEndsAt = now + DOUBLE_PHASE_DURATION_MS.BETTING;
+    serverDoubleState.roundBets.clear();
+
+    io.to(DOUBLE_ROOM).emit('double:phase', {
+      roundId: serverDoubleState.roundId,
+      phase: 'BETTING',
+      durationMs: DOUBLE_PHASE_DURATION_MS.BETTING,
+      remainingMs: DOUBLE_PHASE_DURATION_MS.BETTING,
+      tileIndex: serverDoubleState.tileIndex,
+    });
+  }
+
+  const nextDelay = Math.max(50, serverDoubleState.phaseEndsAt - Date.now());
+  setTimeout(advanceDoubleServerPhase, nextDelay);
+}
+
+setTimeout(advanceDoubleServerPhase, DOUBLE_PHASE_DURATION_MS.BETTING);
 
 function calculateRoll(clientSeed?: string): number {
   if (clientSeed) {
@@ -1444,9 +1624,130 @@ io.on('connection', (socket: Socket) => {
   socket.on('plinko:drop', handlePlinkoBet);
   socket.on('plinko:play', handlePlinkoBet);
 
+  socket.on('double:join', () => {
+    socket.join(DOUBLE_ROOM);
+    const remainingMs = Math.max(0, serverDoubleState.phaseEndsAt - Date.now());
+    socket.emit('double:state', {
+      roundId: serverDoubleState.roundId,
+      phase: serverDoubleState.phase,
+      durationMs: DOUBLE_PHASE_DURATION_MS[serverDoubleState.phase],
+      remainingMs,
+      tileIndex: serverDoubleState.tileIndex,
+      history: serverDoubleState.history,
+    });
+  });
+
+  socket.on('double:leave', () => {
+    socket.leave(DOUBLE_ROOM);
+  });
+
+  const handleDoubleBet = (payload: DoubleBetPayload, meta?: RequestMeta) => {
+    try {
+      if (
+        serverDoubleState.phase !== 'BETTING' ||
+        serverDoubleState.phaseEndsAt <= Date.now()
+      ) {
+        socket.emit(
+          'exception',
+          { message: 'Betting window is closed.' },
+          meta,
+        );
+        return;
+      }
+
+      if (serverDoubleState.roundBets.has(socket.id)) {
+        socket.emit(
+          'exception',
+          { message: 'Bet already placed for this round.' },
+          meta,
+        );
+        return;
+      }
+
+      const { amount, currencyId = 'btc', types } = payload ?? {};
+      const betBig = new BigNumber(amount);
+      if (!betBig.isFinite() || betBig.lte(0)) {
+        socket.emit(
+          'exception',
+          { message: 'Amount must be a positive number.' },
+          meta,
+        );
+        return;
+      }
+
+      if (!Array.isArray(types) || types.length === 0) {
+        socket.emit(
+          'exception',
+          { message: 'At least one bet type must be selected.' },
+          meta,
+        );
+        return;
+      }
+
+      const uniqueTypes = Array.from(new Set(types));
+      const validBetTypes: DoubleBetType[] = ['RED', 'BLACK', 'GREEN', 'JOKER'];
+      if (
+        uniqueTypes.length !== types.length ||
+        uniqueTypes.some((t) => !validBetTypes.includes(t))
+      ) {
+        socket.emit('exception', { message: 'Invalid bet types.' }, meta);
+        return;
+      }
+
+      const colorCount = uniqueTypes.filter((t) => t !== 'JOKER').length;
+      if (colorCount > DOUBLE_MAX_COLOR_PICKS) {
+        socket.emit(
+          'exception',
+          { message: 'At most two colors can be selected per round.' },
+          meta,
+        );
+        return;
+      }
+
+      const stakeStr = betBig.toFixed();
+      const bets = uniqueTypes.map((type) => ({ type, amount: stakeStr }));
+      const totalStake = betBig.times(bets.length).toFixed();
+
+      serverDoubleState.roundBets.set(socket.id, {
+        socketId: socket.id,
+        currencyId,
+        bets,
+        totalStake,
+      });
+
+      console.log(
+        `[Double:Bet] ${socket.id} round #${serverDoubleState.roundId} -> [${uniqueTypes.join(',')}] x ${stakeStr} ${currencyId} (total ${totalStake})`,
+      );
+
+      socket.emit(
+        'double:bet-accepted',
+        {
+          roundId: serverDoubleState.roundId,
+          totalStake,
+          currencyId,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Double:Bet] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error ? err.message : 'Error processing Double bet.',
+        },
+        meta,
+      );
+    }
+  };
+
+  socket.on('double:bet', handleDoubleBet);
+  socket.on('double:place-bet', handleDoubleBet);
+
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);
     activeTowersGames.delete(socket.id);
+    serverDoubleState.roundBets.delete(socket.id);
     console.log(`[Socket.io] Player disconnected: ${socket.id}`);
   });
 });

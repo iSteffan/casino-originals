@@ -56,6 +56,14 @@ import {
   WALLET_CRYPTO_FRACTION_DIGITS,
 } from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
+import {
+  doublePhaseEventSchema,
+  doubleResultSchema,
+  type DoubleResultPayload,
+  doubleStateSchema,
+  sendDoubleBetCommand,
+} from './double-socket';
 
 interface DoubleRoundState {
   id: number;
@@ -79,6 +87,9 @@ interface DoubleSessionState {
   bets: DoublePlacedBet[];
   betCurrencyId: CashierCurrencyId | null;
   betsFromAutobet: boolean;
+  isPendingBet: boolean;
+  isServerSynced: boolean;
+  rollDurationMs: number;
   /** Newest first, capped at the last-100 stats window. */
   history: DoubleHistoryItem[];
   resultAnnouncement?: DoubleResultAnnouncement;
@@ -127,15 +138,16 @@ function canEditSettings(current: DoubleSessionState): boolean {
   return (
     current.round.phase === 'BETTING' &&
     current.bets.length === 0 &&
+    !current.isPendingBet &&
     !isAutobetActive(current.auto)
   );
 }
 
 /**
- * Frontend-only Double session (no server). Runs the shared round loop
- * BETTING -> LOCKED -> RESOLVING -> FINISHED locally, deducts the stake when a bet is
- * placed (like betstrike's `double:bet`), rolls a strip slot, pays winning picks and
- * keeps the last-100 history.
+ * Double session with WebSocket sync and full local offline fallback.
+ * When connected to the Double server room (`game:double`), follows server phases
+ * (`double:state`, `double:phase`, `double:result`) and sends bets via `double:bet`.
+ * When disconnected or unavailable, runs the local round loop BETTING -> LOCKED -> RESOLVING -> FINISHED.
  */
 export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
   const {
@@ -149,6 +161,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
   } = options;
   const wallet = useWallet();
   const walletRef = useRef(wallet);
+  const { socket, status: socketStatus } = useGameSocket();
 
   const [state, setState] = useState<DoubleSessionState>(() => ({
     mode: initialMode,
@@ -162,6 +175,9 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     bets: [],
     betCurrencyId: null,
     betsFromAutobet: false,
+    isPendingBet: false,
+    isServerSynced: false,
+    rollDurationMs: DOUBLE_PHASE_DURATION_MS.RESOLVING,
     history: [],
     win: CLOSED_DOUBLE_WIN,
     auto: { kind: 'idle' },
@@ -173,6 +189,9 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
   const volumeRef = useRef(state.volume);
   const activeSoundsRef = useRef(new Set<HTMLAudioElement>());
   const cancelScrollRef = useRef<(() => void) | null>(null);
+  const cancelBetSocketRef = useRef<(() => void) | null>(null);
+  const settledRoundIdRef = useRef<number | null>(null);
+  const pendingServerResultsRef = useRef<Map<number, DoubleResultPayload>>(new Map());
 
   useLayoutEffect(() => {
     walletRef.current = wallet;
@@ -203,6 +222,8 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     preloadDoubleSounds();
     const activeSounds = activeSoundsRef.current;
     return () => {
+      cancelBetSocketRef.current?.();
+      cancelBetSocketRef.current = null;
       cancelScrollRef.current?.();
       cancelScrollRef.current = null;
       stopDoubleSounds(activeSounds);
@@ -213,26 +234,80 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     setDoubleSoundsVolume(activeSoundsRef.current, state.volume);
   }, [state.volume]);
 
+  const commitPlacedBets = (
+    bets: DoublePlacedBet[],
+    currencyId: CashierCurrencyId,
+    fromAutobet: boolean,
+  ): boolean => {
+    const total = bets.reduce((acc, bet) => acc.plus(bet.amount), new BigNumber(0)).toFixed();
+    if (!walletRef.current.applyRound({ betAmount: total, payoutAmount: '0' })) {
+      commit({ isPendingBet: false });
+      return false;
+    }
+
+    commit({
+      bets,
+      betCurrencyId: currencyId,
+      betsFromAutobet: fromAutobet,
+      isPendingBet: false,
+    });
+    return true;
+  };
+
   /** Places every selected pick with the same stake; all or nothing. */
   const placeBets = (fromAutobet: boolean): boolean => {
     const current = stateRef.current;
     const { round } = current;
-    if (round.phase !== 'BETTING' || round.phaseEndsAt <= Date.now() || current.bets.length > 0) {
+    if (
+      round.phase !== 'BETTING' ||
+      round.phaseEndsAt <= Date.now() ||
+      current.bets.length > 0 ||
+      current.isPendingBet
+    ) {
       return false;
     }
     const currentWallet = walletRef.current;
+    const currencyId = currentWallet.currencyId;
+    const betTypesSnapshot = [...current.selectedBetTypes];
     const bets = createDoubleBets({
       amount: current.betAmount,
-      types: current.selectedBetTypes,
-      available: currentWallet.balances[currentWallet.currencyId],
+      types: betTypesSnapshot,
+      available: currentWallet.balances[currencyId],
     });
     if (!bets) return false;
 
-    const total = getDoubleTotalStake(current.betAmount, current.selectedBetTypes);
-    if (!currentWallet.applyRound({ betAmount: total, payoutAmount: '0' })) return false;
+    if (socketStatus === 'connected' && socket && current.isServerSynced) {
+      commit({ isPendingBet: true });
+      cancelBetSocketRef.current?.();
+      cancelBetSocketRef.current = sendDoubleBetCommand(
+        socket,
+        {
+          amount: current.betAmount,
+          currencyId,
+          types: betTypesSnapshot,
+          roundId: round.id,
+        },
+        {
+          onAccepted: () => {
+            cancelBetSocketRef.current = null;
+            commitPlacedBets(bets, currencyId, fromAutobet);
+          },
+          onError: (errMsg, { isRejection }) => {
+            cancelBetSocketRef.current = null;
+            if (isRejection) {
+              console.warn('[Double] Bet rejected by server:', errMsg);
+              commit({ isPendingBet: false });
+              return;
+            }
+            console.warn('[Double] Socket bet failed, falling back to local round:', errMsg);
+            commitPlacedBets(bets, currencyId, fromAutobet);
+          },
+        },
+      );
+      return true;
+    }
 
-    commit({ bets, betCurrencyId: currentWallet.currencyId, betsFromAutobet: fromAutobet });
-    return true;
+    return commitPlacedBets(bets, currencyId, fromAutobet);
   };
 
   const placeAutoBet = () => {
@@ -260,12 +335,26 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     );
   };
 
-  const finishRound = (now: number) => {
+  const finishRound = (
+    now: number,
+    targetRoundId?: number,
+    targetTileIndex?: number,
+    serverPhaseEndsAt?: number,
+  ) => {
     stopScrollSounds();
     const current = stateRef.current;
     const { round } = current;
-    const outcome = toDoubleOutcome(getDoubleTile(round.tileIndex));
-    const historyItem: DoubleHistoryItem = { id: `double-roll-${round.id}`, ...outcome };
+    const roundId = targetRoundId ?? round.id;
+    const tileIndex = targetTileIndex ?? round.tileIndex;
+
+    if (settledRoundIdRef.current === roundId) return;
+    settledRoundIdRef.current = roundId;
+
+    const serverResult = pendingServerResultsRef.current.get(roundId);
+    pendingServerResultsRef.current.delete(roundId);
+
+    const outcome = serverResult?.outcome ?? toDoubleOutcome(getDoubleTile(tileIndex));
+    const historyItem: DoubleHistoryItem = { id: `double-roll-${roundId}`, ...outcome };
     let message = `Rolled ${formatDoubleOutcome(outcome)}.`;
     let metrics = current.metrics;
     let auto = current.auto;
@@ -273,7 +362,13 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     let win = current.win;
 
     if (current.bets.length > 0 && current.betCurrencyId) {
-      const settlement = settleDoubleBets(current.bets, outcome);
+      const settlement = serverResult
+        ? {
+            betAmount: serverResult.betAmount,
+            payoutAmount: serverResult.payoutAmount,
+            win: serverResult.isWin,
+          }
+        : settleDoubleBets(current.bets, outcome);
       won = settlement.win;
       if (settlement.win) {
         creditPayout(current.betCurrencyId, settlement.payoutAmount);
@@ -319,7 +414,12 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     }
 
     commit({
-      round: { ...round, phase: 'FINISHED', phaseEndsAt: now + DOUBLE_PHASE_DURATION_MS.FINISHED },
+      round: {
+        id: roundId,
+        phase: 'FINISHED',
+        phaseEndsAt: serverPhaseEndsAt ?? now + DOUBLE_PHASE_DURATION_MS.FINISHED,
+        tileIndex,
+      },
       history: [historyItem, ...current.history].slice(0, DOUBLE_STATS_WINDOW),
       resultAnnouncement: { id: historyItem.id, message },
       win,
@@ -328,6 +428,159 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     });
     if (won) playSound('win');
   };
+
+  const handleServerState = useEffectEvent((raw: unknown) => {
+    const parsed = doubleStateSchema.safeParse(raw);
+    if (!parsed.success) return;
+    const data = parsed.data;
+    const now = Date.now();
+    const current = stateRef.current;
+    const phaseEndsAt = now + Math.max(0, data.remainingMs);
+    const sameRound = current.round.id === data.roundId;
+
+    const rollMs =
+      data.phase === 'RESOLVING'
+        ? Math.max(200, data.remainingMs)
+        : DOUBLE_PHASE_DURATION_MS.RESOLVING;
+
+    stopScrollSounds();
+    if (
+      data.phase === 'RESOLVING' &&
+      data.remainingMs > DOUBLE_SCROLL_SOUND_LEAD_OUT_MS + 200
+    ) {
+      playSound('start');
+      cancelScrollRef.current = scheduleDoubleScrollSounds(() => playSound('scroll'), {
+        totalDuration: data.remainingMs - DOUBLE_SCROLL_SOUND_LEAD_OUT_MS,
+      });
+    }
+
+    commit({
+      isServerSynced: true,
+      rollDurationMs: rollMs,
+      round: {
+        id: data.roundId,
+        phase: data.phase,
+        phaseEndsAt,
+        tileIndex: data.tileIndex,
+      },
+      history:
+        data.history.length > 0
+          ? data.history.slice(0, DOUBLE_STATS_WINDOW)
+          : current.history,
+      bets: sameRound ? current.bets : [],
+      betCurrencyId: sameRound ? current.betCurrencyId : null,
+      betsFromAutobet: sameRound ? current.betsFromAutobet : false,
+      win: data.phase === 'BETTING' ? { ...current.win, open: false } : current.win,
+    });
+
+    if (
+      data.phase === 'BETTING' &&
+      data.remainingMs > DOUBLE_AUTOBET_JOIN_MIN_MS &&
+      !sameRound
+    ) {
+      placeAutoBet();
+    }
+  });
+
+  const handleServerPhase = useEffectEvent((raw: unknown) => {
+    const parsed = doublePhaseEventSchema.safeParse(raw);
+    if (!parsed.success) return;
+    const data = parsed.data;
+    const now = Date.now();
+    const current = stateRef.current;
+    const phaseEndsAt = now + Math.max(0, data.remainingMs);
+
+    if (data.phase === 'BETTING') {
+      stopScrollSounds();
+      commit({
+        isServerSynced: true,
+        rollDurationMs: DOUBLE_PHASE_DURATION_MS.RESOLVING,
+        round: {
+          id: data.roundId,
+          phase: 'BETTING',
+          phaseEndsAt,
+          tileIndex: data.tileIndex,
+        },
+        bets: [],
+        betCurrencyId: null,
+        betsFromAutobet: false,
+        isPendingBet: false,
+        win: { ...current.win, open: false },
+      });
+      placeAutoBet();
+      return;
+    }
+
+    if (data.phase === 'LOCKED') {
+      commit({
+        isServerSynced: true,
+        round: {
+          id: data.roundId,
+          phase: 'LOCKED',
+          phaseEndsAt,
+          tileIndex: current.round.tileIndex,
+        },
+      });
+      return;
+    }
+
+    if (data.phase === 'RESOLVING') {
+      const rollMs =
+        data.remainingMs > 0 ? data.remainingMs : DOUBLE_PHASE_DURATION_MS.RESOLVING;
+      commit({
+        isServerSynced: true,
+        rollDurationMs: rollMs,
+        round: {
+          id: data.roundId,
+          phase: 'RESOLVING',
+          phaseEndsAt: now + rollMs,
+          tileIndex: data.tileIndex,
+        },
+      });
+      playSound('start');
+      stopScrollSounds();
+      cancelScrollRef.current = scheduleDoubleScrollSounds(() => playSound('scroll'), {
+        totalDuration: Math.max(100, rollMs - DOUBLE_SCROLL_SOUND_LEAD_OUT_MS),
+      });
+      return;
+    }
+
+    if (data.phase === 'FINISHED') {
+      commit({ isServerSynced: true });
+      finishRound(now, data.roundId, data.tileIndex, phaseEndsAt);
+    }
+  });
+
+  const handleServerResult = useEffectEvent((raw: unknown) => {
+    const parsed = doubleResultSchema.safeParse(raw);
+    if (!parsed.success) return;
+    pendingServerResultsRef.current.set(parsed.data.roundId, parsed.data);
+  });
+
+  useEffect(() => {
+    if (socketStatus !== 'connected' || !socket) {
+      cancelBetSocketRef.current?.();
+      cancelBetSocketRef.current = null;
+      if (stateRef.current.isServerSynced || stateRef.current.isPendingBet) {
+        commit({ isServerSynced: false, isPendingBet: false });
+      }
+      return undefined;
+    }
+
+    socket.on('double:state', handleServerState);
+    socket.on('double:phase', handleServerPhase);
+    socket.on('double:result', handleServerResult);
+    socket.emit('double:join');
+
+    return () => {
+      socket.off('double:state', handleServerState);
+      socket.off('double:phase', handleServerPhase);
+      socket.off('double:result', handleServerResult);
+      if (socket.connected) {
+        socket.emit('double:leave');
+      }
+    };
+  }, [socketStatus, socket, commit]);
 
   const advancePhase = useEffectEvent(() => {
     const current = stateRef.current;
@@ -348,6 +601,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
       case 'LOCKED': {
         const rollMs = DOUBLE_PHASE_DURATION_MS.RESOLVING;
         commit({
+          rollDurationMs: rollMs,
           round: {
             ...round,
             phase: 'RESOLVING',
@@ -367,6 +621,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
         return;
       case 'FINISHED':
         commit({
+          rollDurationMs: DOUBLE_PHASE_DURATION_MS.RESOLVING,
           round: {
             id: round.id + 1,
             phase: 'BETTING',
@@ -384,13 +639,14 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     }
   });
 
-  // Round loop: one timer per phase.
+  // Offline round loop: active whenever not driven by server phases.
   useEffect(() => {
+    if (state.isServerSynced) return undefined;
     const delay =
       state.round.phaseEndsAt === 0 ? 0 : Math.max(0, state.round.phaseEndsAt - Date.now());
     const timer = window.setTimeout(() => advancePhase(), delay);
     return () => window.clearTimeout(timer);
-  }, [state.round.id, state.round.phase, state.round.phaseEndsAt]);
+  }, [state.isServerSynced, state.round.id, state.round.phase, state.round.phaseEndsAt]);
 
   const placeManualBet = () => {
     const current = stateRef.current;
@@ -425,6 +681,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
       current.mode !== 'auto' ||
       isAutobetActive(current.auto) ||
       current.bets.length > 0 ||
+      current.isPendingBet ||
       !canAffordSelection(current) ||
       getConfiguredMaxRounds(current.rounds) <= 0
     ) {
@@ -458,7 +715,7 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
     const current = stateRef.current;
     if (current.auto.kind !== 'running') return;
     // A bet already in this round still settles before the run pauses.
-    if (current.bets.length > 0 && current.betsFromAutobet) {
+    if ((current.bets.length > 0 || current.isPendingBet) && current.betsFromAutobet) {
       commit({ auto: { kind: 'stopping' } });
       return;
     }
@@ -575,12 +832,12 @@ export function useDoubleSession(options: UseDoubleSessionOptions = {}) {
 
   return {
     ...state,
+    socketStatus,
     wallet,
     phase: state.round.phase,
     phaseEndsAt: state.round.phaseEndsAt,
     tileIndex: state.round.tileIndex,
     bettingDurationMs: DOUBLE_PHASE_DURATION_MS.BETTING,
-    rollDurationMs: DOUBLE_PHASE_DURATION_MS.RESOLVING,
     lastResults: state.history.slice(0, DOUBLE_LAST_RESULTS_LIMIT),
     stats: getDoubleLast100Stats(state.history),
     hasStake,

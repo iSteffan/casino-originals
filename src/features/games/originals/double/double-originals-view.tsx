@@ -20,6 +20,7 @@ export interface DoubleOriginalsViewProps {
   winOverlay: GameWinModalProps;
   header: {
     title: string;
+    modeControl?: React.ReactNode;
     volume: number;
     isTheatreMode: boolean;
     onVolumeChange: (volume: number) => void;
@@ -71,6 +72,7 @@ export function DoubleOriginalsView({
         >
           <GameHeader
             title={header.title}
+            modeControl={header.modeControl}
             onBackClick={header.onBackClick}
             showVolumeControl
             volume={header.volume}
