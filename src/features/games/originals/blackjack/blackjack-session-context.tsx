@@ -18,6 +18,15 @@ import {
 } from 'react';
 
 import { calculateScore, generateDeck } from './blackjack-helpers';
+import {
+  sendBlackjackActionCommand,
+  sendBlackjackInsuranceCommand,
+  sendBlackjackStartCommand,
+  type BlackjackActionResult,
+  type BlackjackSocketSettlement,
+  type BlackjackStartResult,
+} from './blackjack-socket';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
 
 type Suit = 'Hearts' | 'Diamonds' | 'Clubs' | 'Spades';
 type Rank =
@@ -42,6 +51,7 @@ export interface Card {
   rank: Rank;
   isGoldCard?: boolean;
   isGoldJoker?: boolean;
+  hidden?: boolean;
 }
 
 interface BetHistoryItem {
@@ -59,6 +69,7 @@ interface BetHistoryItem {
   handsWinAmount: number;
   /** At least one player hand won (betstrike win-modal rule: some win | blackjack). */
   isPlayerWin: boolean;
+  serverSettlement?: BlackjackSocketSettlement;
 }
 
 interface BlackjackGameContextProps {
@@ -85,7 +96,7 @@ interface BlackjackGameContextProps {
 
   isGameOver: boolean;
 
-  startGame: () => void;
+  startGame: (options?: { amount?: string; currencyId?: string }) => void;
   /** Storybook / demo helper: deal fixed player + dealer cards (legacy customStartGame). */
   customStartGame: (playerCards: Card[], dealerCards: Card[]) => void;
   hit: () => void;
@@ -108,6 +119,7 @@ interface BlackjackGameContextProps {
   isLose: boolean;
 
   isBtnActivated: boolean;
+  isPendingAction: boolean;
   isGameRunning: boolean;
 }
 
@@ -150,7 +162,10 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
 
   const [isFirstRoundEnded, setIsFirstRoundEnded] = useState(false);
   const [isBtnActivated, setIsBtnActivated] = useState(false);
+  const [isPendingAction, setIsPendingAction] = useState(false);
   const [isGameRunning, setIsGameRunning] = useState(false);
+
+  const { socket, connected } = useGameSocket();
 
   /**
    * One dealer play-out per round. On split, stand() on the last hand and the split
@@ -167,12 +182,41 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
    */
   const roundIdRef = useRef(0);
   const recordedRoundIdRef = useRef<number | null>(null);
+  const roundTransportRef = useRef<'socket' | 'local'>('local');
+  const pendingStartResultRef = useRef<BlackjackStartResult | null>(null);
+  const serverSettlementRef = useRef<BlackjackSocketSettlement | null>(null);
+  const insuranceDispatchedRoundRef = useRef<number | null>(null);
+  const cancelSocketRef = useRef<(() => void) | null>(null);
+  const timersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
 
-  const startGame = () => {
-    if (isGameRunning) return;
+  const scheduleTimer = (fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      timersRef.current.delete(id);
+      fn();
+    }, ms);
+    timersRef.current.add(id);
+    return id;
+  };
+
+  const clearScheduledTimers = () => {
+    timersRef.current.forEach((id) => clearTimeout(id));
+    timersRef.current.clear();
+  };
+
+  useEffect(() => {
+    return () => {
+      cancelSocketRef.current?.();
+      cancelSocketRef.current = null;
+      clearScheduledTimers();
+    };
+  }, []);
+
+  const resetRoundState = () => {
+    cancelSocketRef.current?.();
+    cancelSocketRef.current = null;
+    clearScheduledTimers();
 
     setIsGameRunning(true);
-
     setDeck([]);
     setPlayerHands([]);
     setPlayerHandsScores([]);
@@ -203,20 +247,29 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     setIsWinInsurance(false);
     setIsLoseInsurance(false);
     setIsBtnActivated(false);
+    setIsPendingAction(false);
 
     hasCheckedBlackjackRef.current = false;
     dealerPlayStartedRef.current = false;
+    pendingStartResultRef.current = null;
+    serverSettlementRef.current = null;
+    insuranceDispatchedRoundRef.current = null;
     roundIdRef.current += 1;
+  };
 
-    const freshDeck = generateDeck();
-    const deckCopy = [...freshDeck];
+  const runStaggeredInitialDeal = (
+    p1: Card,
+    d1: Card,
+    p2: Card,
+    d2: Card,
+    remainingDeck: Card[],
+    activeRoundId: number,
+  ) => {
     const player: Card[] = [];
     const dealer: Card[] = [];
 
-    const dealCard = (toPlayer: boolean) => {
-      const card = deckCopy.shift();
-      if (!card) return;
-
+    const dealCard = (toPlayer: boolean, card: Card) => {
+      if (roundIdRef.current !== activeRoundId) return;
       if (toPlayer) {
         player.push(card);
         setPlayerHands([[...player]]);
@@ -227,62 +280,158 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    setTimeout(() => {
-      dealCard(true); // P1
-      setTimeout(() => {
-        dealCard(false); // D1
-        setTimeout(() => {
-          dealCard(true); // P2
-          setTimeout(() => {
-            dealCard(false); // D2
-            setDeck(deckCopy);
+    scheduleTimer(() => {
+      dealCard(true, p1);
+      scheduleTimer(() => {
+        dealCard(false, d1);
+        scheduleTimer(() => {
+          dealCard(true, p2);
+          scheduleTimer(() => {
+            dealCard(false, d2);
+            if (roundIdRef.current === activeRoundId) {
+              setDeck(remainingDeck);
+            }
           }, 1000);
         }, 1000);
       }, 1000);
     }, 1000);
   };
 
+  const buildFallbackDeckExcluding = (usedCards: readonly Card[]): Card[] => {
+    const fresh = generateDeck();
+    return fresh.filter(
+      (c) => !usedCards.some((u) => !u.hidden && u.rank === c.rank && u.suit === c.suit),
+    );
+  };
+
+  const fallbackToLocalMidRound = () => {
+    roundTransportRef.current = 'local';
+    const usedCards = [...playerHands.flat(), ...dealerHand];
+    const remaining = buildFallbackDeckExcluding(usedCards);
+    if (dealerHand[1]?.hidden) {
+      const replacementHole = remaining.shift() ?? dealerHand[1];
+      setDealerHand([dealerHand[0], { ...replacementHole, hidden: false }]);
+    }
+    setDeck(remaining);
+    setIsPendingAction(false);
+    setIsBtnActivated(false);
+  };
+
+  const animateServerFinish = (
+    res: {
+      dealerHand?: Card[];
+      handResults: HandResult[];
+      isWin?: boolean;
+      isLose?: boolean;
+      isPush?: boolean;
+      settlement?: BlackjackSocketSettlement;
+    },
+    activeRoundId: number,
+  ) => {
+    if (roundIdRef.current !== activeRoundId) return;
+    const finalDealer = res.dealerHand ?? dealerHand;
+    const initialTwo = finalDealer.slice(0, 2);
+    const extraDealerCards = finalDealer.slice(2);
+
+    setDealerHand(initialTwo);
+    setRevealDealerSecondCard(true);
+
+    const finalize = () => {
+      if (roundIdRef.current !== activeRoundId) return;
+      setHandResults(res.handResults);
+      setIsWin(Boolean(res.isWin));
+      setIsLose(Boolean(res.isLose));
+      setIsPush(Boolean(res.isPush));
+      serverSettlementRef.current = res.settlement ?? null;
+      setIsGameOver(true);
+      setIsGameRunning(false);
+      setIsBtnActivated(false);
+    };
+
+    if (extraDealerCards.length === 0) {
+      scheduleTimer(finalize, 600);
+      return;
+    }
+
+    extraDealerCards.forEach((_, extraIdx) => {
+      scheduleTimer(() => {
+        if (roundIdRef.current !== activeRoundId) return;
+        setDealerHand(finalDealer.slice(0, 2 + extraIdx + 1));
+        if (extraIdx === extraDealerCards.length - 1) {
+          scheduleTimer(finalize, 650);
+        }
+      }, (extraIdx + 1) * 1000);
+    });
+  };
+
+  const startGame = (options?: { amount?: string; currencyId?: string }) => {
+    if (isGameRunning || isPendingAction) return;
+
+    resetRoundState();
+    const activeRoundId = roundIdRef.current;
+
+    const startLocalRound = () => {
+      roundTransportRef.current = 'local';
+      const freshDeck = generateDeck();
+      const deckCopy = [...freshDeck];
+      const p1 = deckCopy.shift()!;
+      const d1 = deckCopy.shift()!;
+      const p2 = deckCopy.shift()!;
+      const d2 = deckCopy.shift()!;
+      runStaggeredInitialDeal(p1, d1, p2, d2, deckCopy, activeRoundId);
+    };
+
+    const amountStr = options?.amount ?? String(betAmount);
+    const amountNum = Number.parseFloat(amountStr);
+    if (socket && connected && Number.isFinite(amountNum) && amountNum > 0) {
+      setIsPendingAction(true);
+      cancelSocketRef.current = sendBlackjackStartCommand(
+        socket,
+        {
+          amount: amountStr,
+          currencyId: options?.currencyId ?? 'btc',
+        },
+        {
+          onResult: (res) => {
+            if (roundIdRef.current !== activeRoundId) return;
+            cancelSocketRef.current = null;
+            setIsPendingAction(false);
+            roundTransportRef.current = 'socket';
+            pendingStartResultRef.current = res;
+            const firstHand = res.playerHands[0] ?? [];
+            const p1 = firstHand[0]!;
+            const p2 = firstHand[1]!;
+            const d1 = res.dealerUpCard;
+            const d2Hidden: Card = {
+              suit: d1.suit,
+              rank: d1.rank,
+              hidden: true,
+            };
+            runStaggeredInitialDeal(p1, d1, p2, d2Hidden, [], activeRoundId);
+          },
+          onError: (errMsg) => {
+            if (roundIdRef.current !== activeRoundId) return;
+            console.warn('[Blackjack] Socket start error, fallback to local:', errMsg);
+            cancelSocketRef.current = null;
+            setIsPendingAction(false);
+            startLocalRound();
+          },
+        },
+      );
+      return;
+    }
+
+    startLocalRound();
+  };
+
 
   // -------------------------------------------------------------------test---should be deleted after all checks------------
   const customStartGame = (playerCards: Card[], dealerCards: Card[]) => {
-    if (isGameRunning) return;
+    if (isGameRunning || isPendingAction) return;
 
-    setIsGameRunning(true);
-
-    setDeck([]);
-    setPlayerHands([]);
-    setPlayerHandsScores([]);
-    setDealerHand([]);
-    setHandResults([]);
-    setPlayerScore(0);
-    setDealerScore(0);
-
-    setFlippedPlayerCards([]);
-    setLocalFlippedFirstHand([]);
-    setLocalFlippedSecondHand([]);
-    setFlippedDealerCards([]);
-    setRevealDealerSecondCard(false);
-    setBetHistory([]);
-    setCanSplit(false);
-    setIsSplitDone(false);
-    setIsGameOver(false);
-
-    setIsWin(false);
-    setIsLose(false);
-    setIsPush(false);
-    setIsFirstRoundEnded(false);
-
-    setActiveHandIndex(0);
-
-    setInsuranceOffered(false);
-    setInsuranceAccepted(null);
-    setIsWinInsurance(false);
-    setIsLoseInsurance(false);
-    setIsBtnActivated(false);
-
-    hasCheckedBlackjackRef.current = false;
-    dealerPlayStartedRef.current = false;
-    roundIdRef.current += 1;
+    resetRoundState();
+    roundTransportRef.current = 'local';
+    const activeRoundId = roundIdRef.current;
 
     const freshDeck = generateDeck();
     const deckCopy = [...freshDeck];
@@ -295,33 +444,14 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     };
     [...playerCards, ...dealerCards].forEach(removeCard);
 
-    const player: Card[] = [];
-    const dealer: Card[] = [];
-
-    const dealCard = (toPlayer: boolean, card: Card) => {
-      if (toPlayer) {
-        player.push(card);
-        setPlayerHands([[...player]]);
-        setHandResults(['pending']);
-      } else {
-        dealer.push(card);
-        setDealerHand([...dealer]);
-      }
-    };
-
-    setTimeout(() => {
-      dealCard(true, playerCards[0]);
-      setTimeout(() => {
-        dealCard(false, dealerCards[0]);
-        setTimeout(() => {
-          dealCard(true, playerCards[1]);
-          setTimeout(() => {
-            dealCard(false, dealerCards[1]);
-            setDeck(deckCopy);
-          }, 1000);
-        }, 1000);
-      }, 1000);
-    }, 1000);
+    runStaggeredInitialDeal(
+      playerCards[0],
+      dealerCards[0],
+      playerCards[1],
+      dealerCards[1],
+      deckCopy,
+      activeRoundId,
+    );
   };
   // ------------------------------------------------------------------------------------------------------------------------
 
@@ -346,37 +476,107 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [dealerHand]);
 
+  const applyHitCard = (card: Card, targetHandIndex: number) => {
+    const handsCopy = [...playerHands];
+    handsCopy[targetHandIndex] = [...(handsCopy[targetHandIndex] ?? []), card];
+    setPlayerHands(handsCopy);
+
+    if (targetHandIndex === 0) {
+      setLocalFlippedFirstHand((prev) => [...prev, false]);
+    } else {
+      setLocalFlippedSecondHand((prev) => [...prev, false]);
+    }
+  };
+
   const hit = () => {
+    if (isGameOver || isPendingAction || isBtnActivated) return;
+
+    if (roundTransportRef.current === 'socket' && socket && connected) {
+      const activeRoundId = roundIdRef.current;
+      setIsBtnActivated(true);
+      setIsPendingAction(true);
+      setCanSplit(false);
+
+      cancelSocketRef.current = sendBlackjackActionCommand(socket, 'hit', {
+        onResult: (res: BlackjackActionResult) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          cancelSocketRef.current = null;
+          setIsPendingAction(false);
+          if (res.card) {
+            applyHitCard(res.card, res.handIndex);
+          }
+
+          if (res.status === 'finished') {
+            scheduleTimer(() => {
+              animateServerFinish(res, activeRoundId);
+            }, 650);
+          } else {
+            scheduleTimer(() => {
+              if (roundIdRef.current !== activeRoundId) return;
+              setHandResults(res.handResults);
+              setActiveHandIndex(res.activeHandIndex);
+              setIsBtnActivated(false);
+            }, 650);
+          }
+        },
+        onError: (errMsg) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          console.warn('[Blackjack] Socket hit error, fallback to local:', errMsg);
+          cancelSocketRef.current = null;
+          fallbackToLocalMidRound();
+        },
+      });
+      return;
+    }
+
     if (!deck.length) return;
-    if (isGameOver || deck.length === 0) return;
 
     setIsBtnActivated(true);
-
     setCanSplit(false);
 
     const deckCopy = [...deck];
     const cardIndex = Math.floor(Math.random() * deckCopy.length);
     const card = deckCopy.splice(cardIndex, 1)[0];
 
-    const handsCopy = [...playerHands];
-    handsCopy[activeHandIndex] = [...handsCopy[activeHandIndex], card];
-
-    setPlayerHands(handsCopy);
+    applyHitCard(card, activeHandIndex);
     setDeck(deckCopy);
 
-    if (activeHandIndex === 0) {
-      setLocalFlippedFirstHand((prev) => [...prev, false]);
-    } else {
-      setLocalFlippedSecondHand((prev) => [...prev, false]);
-    }
-
-    setTimeout(() => {
+    scheduleTimer(() => {
       setIsBtnActivated(false);
     }, 1000);
   };
 
   const stand = () => {
-    if (isGameOver) return;
+    if (isGameOver || isPendingAction || isBtnActivated) return;
+
+    if (roundTransportRef.current === 'socket' && socket && connected) {
+      const activeRoundId = roundIdRef.current;
+      setIsBtnActivated(true);
+      setIsPendingAction(true);
+      setCanSplit(false);
+
+      cancelSocketRef.current = sendBlackjackActionCommand(socket, 'stand', {
+        onResult: (res: BlackjackActionResult) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          cancelSocketRef.current = null;
+          setIsPendingAction(false);
+          setHandResults(res.handResults);
+          if (res.status === 'playing') {
+            setActiveHandIndex(res.activeHandIndex);
+            setIsBtnActivated(false);
+          } else {
+            animateServerFinish(res, activeRoundId);
+          }
+        },
+        onError: (errMsg) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          console.warn('[Blackjack] Socket stand error, fallback to local:', errMsg);
+          cancelSocketRef.current = null;
+          fallbackToLocalMidRound();
+        },
+      });
+      return;
+    }
 
     setIsBtnActivated(true);
 
@@ -482,7 +682,36 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
   const doubleDown = () => {
     if (playerHands.length === 0 || playerHands[0].length !== 2) return;
     if (isSplitDone) return;
-    if (isGameOver) return;
+    if (isGameOver || isPendingAction || isBtnActivated) return;
+
+    if (roundTransportRef.current === 'socket' && socket && connected) {
+      const activeRoundId = roundIdRef.current;
+      setIsBtnActivated(true);
+      setIsPendingAction(true);
+      setCanSplit(false);
+      setBetAmount((prev) => prev * 2);
+
+      cancelSocketRef.current = sendBlackjackActionCommand(socket, 'double', {
+        onResult: (res: BlackjackActionResult) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          cancelSocketRef.current = null;
+          setIsPendingAction(false);
+          if (res.card) {
+            applyHitCard(res.card, 0);
+          }
+          scheduleTimer(() => {
+            animateServerFinish(res, activeRoundId);
+          }, 650);
+        },
+        onError: (errMsg) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          console.warn('[Blackjack] Socket double error, fallback to local:', errMsg);
+          cancelSocketRef.current = null;
+          fallbackToLocalMidRound();
+        },
+      });
+      return;
+    }
 
     setIsBtnActivated(true);
 
@@ -580,9 +809,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const split = () => {
-    if (!canSplit) return;
-
-    setIsSplitDone(true);
+    if (!canSplit || isPendingAction || isBtnActivated || isSplitDone) return;
 
     const handsCopy = [...playerHands];
     const handToSplit = handsCopy[0];
@@ -590,6 +817,53 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
 
     const firstHand = [handToSplit[0]];
     const secondHand = [handToSplit[1]];
+
+    if (roundTransportRef.current === 'socket' && socket && connected) {
+      const activeRoundId = roundIdRef.current;
+      setIsBtnActivated(true);
+      setIsPendingAction(true);
+
+      cancelSocketRef.current = sendBlackjackActionCommand(socket, 'split', {
+        onResult: (res: BlackjackActionResult) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          cancelSocketRef.current = null;
+          setIsPendingAction(false);
+
+          setIsSplitDone(true);
+          setPlayerHands([firstHand, secondHand]);
+          setPlayerHandsScores([
+            calculateScore(firstHand),
+            calculateScore(secondHand),
+          ]);
+          setHandResults(['pending', 'pending']);
+          setLocalFlippedFirstHand([true]);
+          setLocalFlippedSecondHand([true]);
+          setActiveHandIndex(0);
+          setCanSplit(false);
+
+          scheduleTimer(() => {
+            if (roundIdRef.current !== activeRoundId) return;
+            setPlayerHands(res.playerHands);
+            setLocalFlippedFirstHand((prev) => [...prev, false]);
+            setLocalFlippedSecondHand((prev) => [...prev, false]);
+            setFlippedPlayerCards((prev) => [...prev, false, false]);
+            scheduleTimer(() => {
+              if (roundIdRef.current !== activeRoundId) return;
+              setIsBtnActivated(false);
+            }, 600);
+          }, 1000);
+        },
+        onError: (errMsg) => {
+          if (roundIdRef.current !== activeRoundId) return;
+          console.warn('[Blackjack] Socket split error, fallback to local:', errMsg);
+          cancelSocketRef.current = null;
+          fallbackToLocalMidRound();
+        },
+      });
+      return;
+    }
+
+    setIsSplitDone(true);
 
     const newHands = [firstHand, secondHand];
 
@@ -607,6 +881,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
 
   // useEffect - check bust and change hands for split game
   useEffect(() => {
+    if (roundTransportRef.current === 'socket') return;
     if (!isSplitDone) return;
     if (isGameOver) return;
 
@@ -666,6 +941,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
 
   // useEffect - check bust for usual game
   useEffect(() => {
+    if (roundTransportRef.current === 'socket') return;
     if (playerHands.length === 0 || isSplitDone) return;
 
     const currentHandCards = playerHands[0].filter(
@@ -680,6 +956,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
 
   // add second cards for both hands after split
   useEffect(() => {
+    if (roundTransportRef.current === 'socket') return;
     if (!isSplitDone) return;
 
     const timeout = setTimeout(() => {
@@ -721,6 +998,36 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
     if (isFirstRoundEnded) return;
 
     setIsFirstRoundEnded(true);
+
+    if (roundTransportRef.current === 'socket') {
+      const startRes = pendingStartResultRef.current;
+      if (!startRes) return;
+      setCanSplit(startRes.canSplit);
+
+      if (startRes.status === 'insurance') {
+        setInsuranceOffered(true);
+        return;
+      }
+
+      if (startRes.status === 'finished') {
+        if (startRes.dealerHand) {
+          setDealerHand(startRes.dealerHand);
+        }
+        setRevealDealerSecondCard(true);
+        if (startRes.handResults) {
+          setHandResults(startRes.handResults);
+        }
+        setIsWin(Boolean(startRes.isWin));
+        setIsLose(Boolean(startRes.isLose));
+        setIsPush(Boolean(startRes.isPush));
+        serverSettlementRef.current = startRes.settlement ?? null;
+        setIsGameOver(true);
+        setIsGameRunning(false);
+        return;
+      }
+
+      return;
+    }
 
     const dealerUpCard = dealerHand[0];
     const dealerScore = calculateScore(dealerHand);
@@ -773,6 +1080,56 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
   // insurance
   useEffect(() => {
     if (!insuranceOffered || insuranceAccepted === null) return;
+
+    if (roundTransportRef.current === 'socket' && socket && connected) {
+      if (insuranceDispatchedRoundRef.current === roundIdRef.current) return;
+      const activeRoundId = roundIdRef.current;
+      insuranceDispatchedRoundRef.current = activeRoundId;
+      setIsPendingAction(true);
+
+      cancelSocketRef.current = sendBlackjackInsuranceCommand(
+        socket,
+        { accepted: insuranceAccepted },
+        {
+          onResult: (res) => {
+            if (roundIdRef.current !== activeRoundId) return;
+            cancelSocketRef.current = null;
+            setIsPendingAction(false);
+            setInsuranceOffered(false);
+            if (res.insuranceResult === 'win') setIsWinInsurance(true);
+            if (res.insuranceResult === 'lose') setIsLoseInsurance(true);
+
+            if (res.status === 'finished') {
+              if (res.dealerHand) {
+                setDealerHand(res.dealerHand);
+              }
+              setRevealDealerSecondCard(true);
+              if (res.handResults) {
+                setHandResults(res.handResults);
+              }
+              setIsWin(Boolean(res.isWin));
+              setIsLose(Boolean(res.isLose));
+              setIsPush(Boolean(res.isPush));
+              serverSettlementRef.current = res.settlement ?? null;
+              setIsGameOver(true);
+              setIsGameRunning(false);
+            } else {
+              setCanSplit(res.canSplit);
+            }
+          },
+          onError: (errMsg) => {
+            if (roundIdRef.current !== activeRoundId) return;
+            console.warn(
+              '[Blackjack] Socket insurance error, fallback to local:',
+              errMsg,
+            );
+            cancelSocketRef.current = null;
+            fallbackToLocalMidRound();
+          },
+        },
+      );
+      return;
+    }
 
     const timeout = setTimeout(() => {
       if (dealerHand.length < 2 || playerHands[0].length < 2) return;
@@ -864,7 +1221,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
       const score = calculateScore(visibleCards);
       setPlayerScore(score);
 
-      if (score > 21) {
+      if (score > 21 && roundTransportRef.current !== 'socket') {
         setRevealDealerSecondCard(true);
         setIsLose(true);
         setIsGameOver(true);
@@ -886,11 +1243,13 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
         calculateScore(secondHandVisible),
       ]);
 
-      // Check for bust for each hand
-      const resultsCopy = [...handResults];
-      if (calculateScore(firstHandVisible) > 21) resultsCopy[0] = 'busted';
-      if (calculateScore(secondHandVisible) > 21) resultsCopy[1] = 'busted';
-      setHandResults(resultsCopy);
+      if (roundTransportRef.current !== 'socket') {
+        // Check for bust for each hand
+        const resultsCopy = [...handResults];
+        if (calculateScore(firstHandVisible) > 21) resultsCopy[0] = 'busted';
+        if (calculateScore(secondHandVisible) > 21) resultsCopy[1] = 'busted';
+        setHandResults(resultsCopy);
+      }
     }
   }, [
     flippedPlayerCards,
@@ -968,6 +1327,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
       winAmount,
       handsWinAmount: calculateHandsWinAmount(betAmount, handResults),
       isPlayerWin: handResults.some((r) => r === 'win' || r === 'blackjack'),
+      serverSettlement: serverSettlementRef.current ?? undefined,
     };
 
     setBetHistory((prev) => [...prev, newBetItem]);
@@ -1031,6 +1391,7 @@ export const BlackjackProvider = ({ children }: { children: ReactNode }) => {
         isLose,
 
         isBtnActivated,
+        isPendingAction,
         isGameRunning,
       }}
     >

@@ -270,12 +270,14 @@ export function BlackjackTable({
           {ready &&
             dealerHand.map((card, idx) => (
               <motion.li
-                key={`dealer-${idx}-${card.rank}-${card.suit}`}
+                key={idx === 1 ? 'dealer-hole-card' : `dealer-${idx}-${card.rank}-${card.suit}`}
                 initial={getInitialPosition(dealerHandRef)}
                 animate={getDealerAnimatePosition(idx)}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
                 onAnimationStart={() => {
-                  playDealOnce(`dealer-${idx}-${card.rank}-${card.suit}`);
+                  playDealOnce(
+                    idx === 1 ? 'dealer-hole-card' : `dealer-${idx}-${card.rank}-${card.suit}`,
+                  );
                 }}
                 onAnimationComplete={() => {
                   setFlippedDealerCards((prev) => {

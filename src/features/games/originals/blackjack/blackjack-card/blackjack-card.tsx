@@ -82,8 +82,12 @@ export function BlackjackCard({
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
       >
         <img
-          src={`/img/games/blackjack/cards/${rank}-of-${suit}.png`}
-          alt={`${rank} of ${suit}`}
+          src={
+            card.hidden
+              ? '/img/games/blackjack/cards/back.png'
+              : `/img/games/blackjack/cards/${rank}-of-${suit}.png`
+          }
+          alt={card.hidden ? '' : `${rank} of ${suit}`}
           width={102}
           height={132}
           draggable={false}

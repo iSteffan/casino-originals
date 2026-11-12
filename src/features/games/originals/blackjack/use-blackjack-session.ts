@@ -25,6 +25,7 @@ import {
   WALLET_CRYPTO_FRACTION_DIGITS,
 } from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
 
 /**
  * App-side Blackjack session: theatre/volume/stake + demo-wallet settlement.
@@ -33,6 +34,7 @@ import { useWallet } from '#ui/features/wallet/wallet-provider';
 export function useBlackjackSession() {
   const game = useBlackjackGame();
   const wallet = useWallet();
+  const { status: socketStatus } = useGameSocket();
 
   const [theatreMode, setTheatreMode] = useState(false);
   const [volume, setVolume] = useState(0.75);
@@ -144,9 +146,15 @@ export function useBlackjackSession() {
 
     const handsStake = lastBet.isSplit ? unitBet.times(2) : unitBet;
     const insuranceStake = lastBet.insuranceTaken ? unitBet.div(2) : new BigNumber(0);
-    const totalStake = handsStake.plus(insuranceStake);
-    const profit = new BigNumber(lastBet.winAmount);
-    const payoutAmount = totalStake.plus(profit);
+    const totalStake = lastBet.serverSettlement
+      ? new BigNumber(lastBet.serverSettlement.totalStake)
+      : handsStake.plus(insuranceStake);
+    const profit = lastBet.serverSettlement
+      ? new BigNumber(lastBet.serverSettlement.profit)
+      : new BigNumber(lastBet.winAmount);
+    const payoutAmount = lastBet.serverSettlement
+      ? new BigNumber(lastBet.serverSettlement.payoutAmount)
+      : totalStake.plus(profit);
 
     wallet.applyRound({
       betAmount: totalStake.toFixed(),
@@ -156,14 +164,16 @@ export function useBlackjackSession() {
     // betstrike rule: a round is a win when any hand wins (win | blackjack), even if
     // the split net is <= 0 (e.g. hand 1 busts, hand 2 beats the dealer). Insurance-only
     // net wins (insurance paid + push) still open the modal as before.
-    const isWin = lastBet.isPlayerWin || lastBet.winAmount > 0;
+    const isWin = lastBet.isPlayerWin || profit.gt(0);
     if (isWin) {
       const formatAmount = (value: BigNumber) =>
         formatWalletAmountLabel(
           formatWalletAmount(value.abs().toFixed(), wallet.currencyId, wallet.displayFiat),
         );
       const wonAmount = lastBet.isPlayerWin
-        ? new BigNumber(lastBet.handsWinAmount)
+        ? new BigNumber(
+            lastBet.serverSettlement?.handsWinAmount ?? lastBet.handsWinAmount,
+          )
         : profit;
       setWinOverlay({
         open: true,
@@ -204,6 +214,7 @@ export function useBlackjackSession() {
   const stakeNumber = Number.parseFloat(betAmount);
   const canStart =
     !game.isGameRunning &&
+    !game.isPendingAction &&
     hasStake &&
     !exceedsWallet &&
     Number.isFinite(stakeNumber) &&
@@ -219,7 +230,12 @@ export function useBlackjackSession() {
   };
 
   const placeBet = () => {
-    beginDeal(() => game.startGame());
+    beginDeal(() =>
+      game.startGame({
+        amount: betAmountRef.current,
+        currencyId: wallet.currencyId,
+      }),
+    );
   };
 
   /**
@@ -253,6 +269,7 @@ export function useBlackjackSession() {
     !game.isGameRunning ||
     !game.isFirstRoundEnded ||
     game.insuranceOffered ||
+    game.isPendingAction ||
     game.isGameOver;
 
   const actions = useMemo(
@@ -297,6 +314,7 @@ export function useBlackjackSession() {
   return {
     game,
     wallet,
+    socketStatus,
     theatreMode,
     volume,
     betAmount,

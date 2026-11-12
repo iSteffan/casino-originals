@@ -9,6 +9,7 @@ import { useBetAmountDisplay } from '#ui/features/wallet/use-bet-amount-display'
 import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 import type { BlackjackOriginalsViewProps } from './blackjack-originals-view';
 
@@ -107,6 +108,7 @@ export function useBlackjackOriginalsController(
 
   const header: BlackjackOriginalsViewProps['header'] = {
     title: 'Blackjack',
+    modeControl: <SocketStatusBadge status={session.socketStatus} />,
     volume: session.volume,
     isTheatreMode: session.theatreMode,
     onVolumeChange: session.setVolume,

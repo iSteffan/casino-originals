@@ -369,6 +369,199 @@ function rollServerPlinkoBucket(rows: number, clientSeed?: string): number {
   return bucket;
 }
 
+const BLACKJACK_SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades'] as const;
+const BLACKJACK_RANKS = [
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '10',
+  'Jack',
+  'Queen',
+  'King',
+  'Ace',
+] as const;
+
+export type BlackjackSuit = (typeof BLACKJACK_SUITS)[number];
+export type BlackjackRank = (typeof BLACKJACK_RANKS)[number];
+export type BlackjackHandResult =
+  | 'pending'
+  | 'stand'
+  | 'busted'
+  | 'win'
+  | 'lose'
+  | 'push'
+  | 'blackjack';
+
+export interface BlackjackCard {
+  suit: BlackjackSuit;
+  rank: BlackjackRank;
+}
+
+export interface BlackjackSettlement {
+  totalStake: string;
+  payoutAmount: string;
+  profit: string;
+  handsWinAmount: string;
+  isPlayerWin: boolean;
+}
+
+interface ActiveBlackjackGame {
+  roundId: number;
+  unitBetAmount: string;
+  currencyId: string;
+  deck: BlackjackCard[];
+  dealerHand: BlackjackCard[];
+  playerHands: BlackjackCard[][];
+  handResults: BlackjackHandResult[];
+  activeHandIndex: number;
+  isSplitDone: boolean;
+  canSplit: boolean;
+  phase: 'insurance' | 'playing' | 'finished';
+  insuranceTaken: boolean;
+  insuranceResult?: 'win' | 'lose';
+  isDoubled: boolean;
+}
+
+const activeBlackjackGames = new Map<string, ActiveBlackjackGame>();
+let nextBlackjackRoundId = 1;
+
+function createShuffledBlackjackDeck(): BlackjackCard[] {
+  const deck: BlackjackCard[] = [];
+  for (const suit of BLACKJACK_SUITS) {
+    for (const rank of BLACKJACK_RANKS) {
+      deck.push({ suit, rank });
+    }
+  }
+  for (let i = deck.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(0, i + 1);
+    const temp = deck[i]!;
+    deck[i] = deck[j]!;
+    deck[j] = temp;
+  }
+  return deck;
+}
+
+function calculateBlackjackScore(cards: readonly BlackjackCard[]): number {
+  let total = 0;
+  let aces = 0;
+
+  for (const { rank } of cards) {
+    if (rank === 'Ace') {
+      aces += 1;
+      total += 11;
+    } else if (rank === 'King' || rank === 'Queen' || rank === 'Jack') {
+      total += 10;
+    } else {
+      total += Number(rank);
+    }
+  }
+
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces -= 1;
+  }
+
+  return total;
+}
+
+function buildBlackjackSettlement(game: ActiveBlackjackGame): BlackjackSettlement {
+  const baseUnit = new BigNumber(game.unitBetAmount);
+  const effectiveUnit = game.isDoubled ? baseUnit.times(2) : baseUnit;
+  const handsStake = game.isSplitDone ? effectiveUnit.times(2) : effectiveUnit;
+  const insuranceStake = game.insuranceTaken ? baseUnit.div(2) : new BigNumber(0);
+  const totalStake = handsStake.plus(insuranceStake);
+
+  let profit = new BigNumber(0);
+  let handsWinAmount = new BigNumber(0);
+
+  for (const res of game.handResults) {
+    switch (res) {
+      case 'win':
+        profit = profit.plus(effectiveUnit);
+        handsWinAmount = handsWinAmount.plus(effectiveUnit);
+        break;
+      case 'blackjack':
+        profit = profit.plus(effectiveUnit.times(1.5));
+        handsWinAmount = handsWinAmount.plus(effectiveUnit.times(1.5));
+        break;
+      case 'lose':
+      case 'busted':
+        profit = profit.minus(effectiveUnit);
+        break;
+      case 'push':
+      case 'pending':
+      case 'stand':
+        break;
+    }
+  }
+
+  if (game.insuranceTaken) {
+    if (game.insuranceResult === 'win') {
+      profit = profit.plus(baseUnit.div(2));
+    } else {
+      profit = profit.minus(baseUnit.div(2));
+    }
+  }
+
+  const rawPayout = totalStake.plus(profit);
+  const payoutAmount = rawPayout.gt(0) ? rawPayout : new BigNumber(0);
+  const isPlayerWin = game.handResults.some(
+    (res) => res === 'win' || res === 'blackjack',
+  );
+
+  return {
+    totalStake: totalStake.toFixed(),
+    payoutAmount: payoutAmount.toFixed(),
+    profit: profit.toFixed(),
+    handsWinAmount: handsWinAmount.toFixed(),
+    isPlayerWin,
+  };
+}
+
+function resolveDealerAndSettleBlackjack(game: ActiveBlackjackGame): {
+  isWin: boolean;
+  isLose: boolean;
+  isPush: boolean;
+  settlement: BlackjackSettlement;
+} {
+  if (!game.handResults.every((res) => res === 'busted')) {
+    while (calculateBlackjackScore(game.dealerHand) < 17 && game.deck.length > 0) {
+      const nextCard = game.deck.shift();
+      if (!nextCard) break;
+      game.dealerHand.push(nextCard);
+    }
+
+    const dealerScoreFinal = calculateBlackjackScore(game.dealerHand);
+
+    game.playerHands.forEach((hand, idx) => {
+      if (game.handResults[idx] === 'busted') return;
+      const pScore = calculateBlackjackScore(hand);
+      if (pScore > 21) {
+        game.handResults[idx] = 'busted';
+      } else if (dealerScoreFinal > 21 || pScore > dealerScoreFinal) {
+        game.handResults[idx] = 'win';
+      } else if (pScore === dealerScoreFinal) {
+        game.handResults[idx] = 'push';
+      } else {
+        game.handResults[idx] = 'lose';
+      }
+    });
+  }
+
+  game.phase = 'finished';
+  const isWin = game.handResults.some((res) => res === 'win' || res === 'blackjack');
+  const isLose = game.handResults.every((res) => res === 'lose' || res === 'busted');
+  const isPush = game.handResults.some((res) => res === 'push');
+  const settlement = buildBlackjackSettlement(game);
+
+  return { isWin, isLose, isPush, settlement };
+}
+
 // Create HTTP server for health checks (useful for Render/Koyeb keep-alive)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -386,7 +579,7 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         status: 'ok',
         service: 'casino-originals-ws-server',
-        games: ['dice', 'mines', 'towers', 'keno', 'coinflip', 'plinko', 'double'],
+        games: ['dice', 'mines', 'towers', 'keno', 'coinflip', 'plinko', 'double', 'blackjack'],
         timestamp: new Date().toISOString(),
       }),
     );
@@ -1744,9 +1937,617 @@ io.on('connection', (socket: Socket) => {
   socket.on('double:bet', handleDoubleBet);
   socket.on('double:place-bet', handleDoubleBet);
 
+  // ============================================
+  // BLACKJACK HANDLERS
+  // ============================================
+
+  socket.on(
+    'blackjack:start',
+    (
+      payload: { amount?: string; currencyId?: string; clientSeed?: string },
+      meta?: RequestMeta,
+    ) => {
+      try {
+        const { amount = '0', currencyId = 'btc' } = payload ?? {};
+        const betBig = new BigNumber(amount);
+        if (!betBig.isFinite() || betBig.lte(0)) {
+          socket.emit(
+            'exception',
+            { message: 'Bet amount must be greater than zero.' },
+            meta,
+          );
+          return;
+        }
+
+        const deck = createShuffledBlackjackDeck();
+        const p1 = deck.shift()!;
+        const d1 = deck.shift()!;
+        const p2 = deck.shift()!;
+        const d2 = deck.shift()!;
+
+        const playerHands: BlackjackCard[][] = [[p1, p2]];
+        const dealerHand: BlackjackCard[] = [d1, d2];
+        const canSplit = p1.rank === p2.rank;
+        const roundId = nextBlackjackRoundId++;
+
+        const playerScore = calculateBlackjackScore(playerHands[0]!);
+        const dealerScore = calculateBlackjackScore(dealerHand);
+        const dealerHasBlackjack = dealerScore === 21;
+        const playerHasBlackjack = playerScore === 21;
+        const insuranceOffered = d1.rank === 'Ace';
+
+        const game: ActiveBlackjackGame = {
+          roundId,
+          unitBetAmount: betBig.toFixed(),
+          currencyId,
+          deck,
+          dealerHand,
+          playerHands,
+          handResults: ['pending'],
+          activeHandIndex: 0,
+          isSplitDone: false,
+          canSplit,
+          phase: insuranceOffered
+            ? 'insurance'
+            : dealerHasBlackjack || playerHasBlackjack
+              ? 'finished'
+              : 'playing',
+          insuranceTaken: false,
+          isDoubled: false,
+        };
+
+        if (!insuranceOffered && (dealerHasBlackjack || playerHasBlackjack)) {
+          if (dealerHasBlackjack && playerHasBlackjack) {
+            game.handResults = ['push'];
+          } else if (dealerHasBlackjack) {
+            game.handResults = ['lose'];
+          } else {
+            game.handResults = ['blackjack'];
+          }
+
+          activeBlackjackGames.delete(socket.id);
+          const settlement = buildBlackjackSettlement(game);
+          const isWin = game.handResults[0] === 'blackjack';
+          const isLose = game.handResults[0] === 'lose';
+          const isPush = game.handResults[0] === 'push';
+
+          console.log(
+            `[Blackjack:Start] ${socket.id} round #${roundId} natural -> ${game.handResults[0]} (${betBig.toFixed()} ${currencyId})`,
+          );
+
+          socket.emit(
+            'blackjack:start:result',
+            {
+              roundId,
+              status: 'finished',
+              betAmount: game.unitBetAmount,
+              currencyId,
+              playerHands,
+              dealerUpCard: d1,
+              dealerHand,
+              canSplit: false,
+              insuranceOffered: false,
+              handResults: game.handResults,
+              isWin,
+              isLose,
+              isPush,
+              settlement,
+            },
+            meta,
+          );
+          return;
+        }
+
+        activeBlackjackGames.set(socket.id, game);
+
+        console.log(
+          `[Blackjack:Start] ${socket.id} round #${roundId} -> Bet ${betBig.toFixed()} ${currencyId} (${game.phase})`,
+        );
+
+        socket.emit(
+          'blackjack:start:result',
+          {
+            roundId,
+            status: game.phase,
+            betAmount: game.unitBetAmount,
+            currencyId,
+            playerHands,
+            dealerUpCard: d1,
+            canSplit,
+            insuranceOffered,
+          },
+          meta,
+        );
+      } catch (err: unknown) {
+        console.error('[Blackjack:Start] Error:', err);
+        socket.emit(
+          'exception',
+          {
+            message:
+              err instanceof Error ? err.message : 'Error starting Blackjack.',
+          },
+          meta,
+        );
+      }
+    },
+  );
+
+  socket.on(
+    'blackjack:insurance',
+    (payload: { accepted?: boolean }, meta?: RequestMeta) => {
+      try {
+        const game = activeBlackjackGames.get(socket.id);
+        if (!game || game.phase !== 'insurance') {
+          socket.emit(
+            'exception',
+            { message: 'No active Blackjack insurance offer.' },
+            meta,
+          );
+          return;
+        }
+
+        const accepted = Boolean(payload?.accepted);
+        game.insuranceTaken = accepted;
+
+        const playerScore = calculateBlackjackScore(game.playerHands[0] ?? []);
+        const dealerScore = calculateBlackjackScore(game.dealerHand);
+        const playerHasBlackjack = playerScore === 21;
+        const dealerHasBlackjack = dealerScore === 21;
+
+        if (dealerHasBlackjack) {
+          if (accepted) {
+            game.insuranceResult = 'win';
+          }
+          game.handResults = [playerHasBlackjack ? 'push' : 'lose'];
+          game.phase = 'finished';
+          activeBlackjackGames.delete(socket.id);
+
+          const settlement = buildBlackjackSettlement(game);
+          console.log(
+            `[Blackjack:Insurance] ${socket.id} round #${game.roundId} dealer BJ (accepted=${accepted}) -> ${game.handResults[0]}`,
+          );
+
+          socket.emit(
+            'blackjack:insurance:result',
+            {
+              roundId: game.roundId,
+              status: 'finished',
+              insuranceTaken: accepted,
+              insuranceResult: game.insuranceResult,
+              canSplit: false,
+              dealerHand: game.dealerHand,
+              handResults: game.handResults,
+              isWin: false,
+              isLose: !playerHasBlackjack,
+              isPush: playerHasBlackjack,
+              settlement,
+            },
+            meta,
+          );
+          return;
+        }
+
+        if (accepted) {
+          game.insuranceResult = 'lose';
+        }
+
+        if (playerHasBlackjack) {
+          game.handResults = ['blackjack'];
+          game.phase = 'finished';
+          activeBlackjackGames.delete(socket.id);
+
+          const settlement = buildBlackjackSettlement(game);
+          console.log(
+            `[Blackjack:Insurance] ${socket.id} round #${game.roundId} player BJ -> blackjack`,
+          );
+
+          socket.emit(
+            'blackjack:insurance:result',
+            {
+              roundId: game.roundId,
+              status: 'finished',
+              insuranceTaken: accepted,
+              insuranceResult: game.insuranceResult,
+              canSplit: false,
+              dealerHand: game.dealerHand,
+              handResults: game.handResults,
+              isWin: true,
+              isLose: false,
+              isPush: false,
+              settlement,
+            },
+            meta,
+          );
+          return;
+        }
+
+        game.phase = 'playing';
+        console.log(
+          `[Blackjack:Insurance] ${socket.id} round #${game.roundId} resolved (accepted=${accepted}) -> playing`,
+        );
+
+        socket.emit(
+          'blackjack:insurance:result',
+          {
+            roundId: game.roundId,
+            status: 'playing',
+            insuranceTaken: accepted,
+            insuranceResult: game.insuranceResult,
+            canSplit: game.canSplit,
+          },
+          meta,
+        );
+      } catch (err: unknown) {
+        console.error('[Blackjack:Insurance] Error:', err);
+        socket.emit(
+          'exception',
+          {
+            message:
+              err instanceof Error
+                ? err.message
+                : 'Error resolving Blackjack insurance.',
+          },
+          meta,
+        );
+      }
+    },
+  );
+
+  socket.on('blackjack:hit', (_payload: unknown, meta?: RequestMeta) => {
+    try {
+      const game = activeBlackjackGames.get(socket.id);
+      if (!game || game.phase !== 'playing') {
+        socket.emit(
+          'exception',
+          { message: 'No active Blackjack round in playing phase.' },
+          meta,
+        );
+        return;
+      }
+
+      const handIndex = game.activeHandIndex;
+      const targetHand = game.playerHands[handIndex];
+      if (!targetHand || game.handResults[handIndex] !== 'pending') {
+        socket.emit(
+          'exception',
+          { message: 'Active Blackjack hand cannot hit.' },
+          meta,
+        );
+        return;
+      }
+
+      const card = game.deck.shift();
+      if (!card) {
+        socket.emit('exception', { message: 'Deck exhausted.' }, meta);
+        return;
+      }
+
+      game.canSplit = false;
+      targetHand.push(card);
+
+      const score = calculateBlackjackScore(targetHand);
+      if (score > 21) {
+        game.handResults[handIndex] = 'busted';
+        if (game.isSplitDone && handIndex === 0) {
+          game.activeHandIndex = 1;
+        } else if (game.handResults.every((res) => res !== 'pending')) {
+          const outcome = resolveDealerAndSettleBlackjack(game);
+          activeBlackjackGames.delete(socket.id);
+
+          console.log(
+            `[Blackjack:Hit] ${socket.id} round #${game.roundId} busted -> finished [${game.handResults.join(',')}]`,
+          );
+
+          socket.emit(
+            'blackjack:action:result',
+            {
+              roundId: game.roundId,
+              action: 'hit',
+              status: 'finished',
+              card,
+              handIndex,
+              playerHands: game.playerHands,
+              activeHandIndex: game.activeHandIndex,
+              isSplitDone: game.isSplitDone,
+              canSplit: false,
+              dealerHand: game.dealerHand,
+              handResults: game.handResults,
+              isWin: outcome.isWin,
+              isLose: outcome.isLose,
+              isPush: outcome.isPush,
+              settlement: outcome.settlement,
+            },
+            meta,
+          );
+          return;
+        }
+      }
+
+      console.log(
+        `[Blackjack:Hit] ${socket.id} round #${game.roundId} hand ${handIndex} -> ${card.rank} of ${card.suit} (score ${score})`,
+      );
+
+      socket.emit(
+        'blackjack:action:result',
+        {
+          roundId: game.roundId,
+          action: 'hit',
+          status: 'playing',
+          card,
+          handIndex,
+          playerHands: game.playerHands,
+          activeHandIndex: game.activeHandIndex,
+          isSplitDone: game.isSplitDone,
+          canSplit: false,
+          handResults: game.handResults,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Blackjack:Hit] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error ? err.message : 'Error processing Blackjack hit.',
+        },
+        meta,
+      );
+    }
+  });
+
+  socket.on('blackjack:stand', (_payload: unknown, meta?: RequestMeta) => {
+    try {
+      const game = activeBlackjackGames.get(socket.id);
+      if (!game || game.phase !== 'playing') {
+        socket.emit(
+          'exception',
+          { message: 'No active Blackjack round in playing phase.' },
+          meta,
+        );
+        return;
+      }
+
+      const handIndex = game.activeHandIndex;
+      if (game.handResults[handIndex] === 'pending') {
+        game.handResults[handIndex] = 'stand';
+      }
+      game.canSplit = false;
+
+      if (game.isSplitDone && handIndex === 0) {
+        game.activeHandIndex = 1;
+        console.log(
+          `[Blackjack:Stand] ${socket.id} round #${game.roundId} hand 0 stand -> hand 1`,
+        );
+
+        socket.emit(
+          'blackjack:action:result',
+          {
+            roundId: game.roundId,
+            action: 'stand',
+            status: 'playing',
+            handIndex,
+            playerHands: game.playerHands,
+            activeHandIndex: game.activeHandIndex,
+            isSplitDone: game.isSplitDone,
+            canSplit: false,
+            handResults: game.handResults,
+          },
+          meta,
+        );
+        return;
+      }
+
+      const outcome = resolveDealerAndSettleBlackjack(game);
+      activeBlackjackGames.delete(socket.id);
+
+      console.log(
+        `[Blackjack:Stand] ${socket.id} round #${game.roundId} finished -> [${game.handResults.join(',')}]`,
+      );
+
+      socket.emit(
+        'blackjack:action:result',
+        {
+          roundId: game.roundId,
+          action: 'stand',
+          status: 'finished',
+          handIndex,
+          playerHands: game.playerHands,
+          activeHandIndex: game.activeHandIndex,
+          isSplitDone: game.isSplitDone,
+          canSplit: false,
+          dealerHand: game.dealerHand,
+          handResults: game.handResults,
+          isWin: outcome.isWin,
+          isLose: outcome.isLose,
+          isPush: outcome.isPush,
+          settlement: outcome.settlement,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Blackjack:Stand] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Error processing Blackjack stand.',
+        },
+        meta,
+      );
+    }
+  });
+
+  socket.on('blackjack:double', (_payload: unknown, meta?: RequestMeta) => {
+    try {
+      const game = activeBlackjackGames.get(socket.id);
+      if (
+        !game ||
+        game.phase !== 'playing' ||
+        game.isSplitDone ||
+        (game.playerHands[0]?.length ?? 0) !== 2
+      ) {
+        socket.emit(
+          'exception',
+          { message: 'Double down is not available right now.' },
+          meta,
+        );
+        return;
+      }
+
+      const card = game.deck.shift();
+      if (!card) {
+        socket.emit('exception', { message: 'Deck exhausted.' }, meta);
+        return;
+      }
+
+      game.isDoubled = true;
+      game.canSplit = false;
+      game.playerHands[0]!.push(card);
+
+      const newScore = calculateBlackjackScore(game.playerHands[0]!);
+      if (newScore > 21) {
+        game.handResults = ['busted'];
+      } else {
+        const dealerInitialScore = calculateBlackjackScore(game.dealerHand);
+        if (dealerInitialScore === 21 && newScore === 21) {
+          game.handResults = ['push'];
+        } else {
+          game.handResults = ['stand'];
+        }
+      }
+
+      let outcome: ReturnType<typeof resolveDealerAndSettleBlackjack>;
+      if (game.handResults[0] === 'stand') {
+        outcome = resolveDealerAndSettleBlackjack(game);
+      } else {
+        game.phase = 'finished';
+        outcome = {
+          isWin: false,
+          isLose: game.handResults[0] === 'busted',
+          isPush: game.handResults[0] === 'push',
+          settlement: buildBlackjackSettlement(game),
+        };
+      }
+
+      activeBlackjackGames.delete(socket.id);
+      console.log(
+        `[Blackjack:Double] ${socket.id} round #${game.roundId} -> ${card.rank} of ${card.suit} (${game.handResults[0]})`,
+      );
+
+      socket.emit(
+        'blackjack:action:result',
+        {
+          roundId: game.roundId,
+          action: 'double',
+          status: 'finished',
+          card,
+          handIndex: 0,
+          playerHands: game.playerHands,
+          activeHandIndex: 0,
+          isSplitDone: false,
+          canSplit: false,
+          isDoubled: true,
+          dealerHand: game.dealerHand,
+          handResults: game.handResults,
+          isWin: outcome.isWin,
+          isLose: outcome.isLose,
+          isPush: outcome.isPush,
+          settlement: outcome.settlement,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Blackjack:Double] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Error processing Blackjack double down.',
+        },
+        meta,
+      );
+    }
+  });
+
+  socket.on('blackjack:split', (_payload: unknown, meta?: RequestMeta) => {
+    try {
+      const game = activeBlackjackGames.get(socket.id);
+      if (
+        !game ||
+        game.phase !== 'playing' ||
+        !game.canSplit ||
+        game.isSplitDone ||
+        (game.playerHands[0]?.length ?? 0) !== 2
+      ) {
+        socket.emit(
+          'exception',
+          { message: 'Split is not available right now.' },
+          meta,
+        );
+        return;
+      }
+
+      const handToSplit = game.playerHands[0]!;
+      const drawn0 = game.deck.shift();
+      const drawn1 = game.deck.shift();
+      if (!drawn0 || !drawn1) {
+        socket.emit('exception', { message: 'Deck exhausted.' }, meta);
+        return;
+      }
+
+      game.isSplitDone = true;
+      game.canSplit = false;
+      game.activeHandIndex = 0;
+      game.handResults = ['pending', 'pending'];
+      game.playerHands = [
+        [handToSplit[0]!, drawn0],
+        [handToSplit[1]!, drawn1],
+      ];
+
+      console.log(
+        `[Blackjack:Split] ${socket.id} round #${game.roundId} split -> hand0 +${drawn0.rank}, hand1 +${drawn1.rank}`,
+      );
+
+      socket.emit(
+        'blackjack:action:result',
+        {
+          roundId: game.roundId,
+          action: 'split',
+          status: 'playing',
+          handIndex: 0,
+          splitDrawnCards: [drawn0, drawn1],
+          playerHands: game.playerHands,
+          activeHandIndex: 0,
+          isSplitDone: true,
+          canSplit: false,
+          handResults: game.handResults,
+        },
+        meta,
+      );
+    } catch (err: unknown) {
+      console.error('[Blackjack:Split] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Error processing Blackjack split.',
+        },
+        meta,
+      );
+    }
+  });
+
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);
     activeTowersGames.delete(socket.id);
+    activeBlackjackGames.delete(socket.id);
     serverDoubleState.roundBets.delete(socket.id);
     console.log(`[Socket.io] Player disconnected: ${socket.id}`);
   });
