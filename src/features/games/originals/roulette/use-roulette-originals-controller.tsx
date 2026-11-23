@@ -22,6 +22,7 @@ import { useAppLayoutState } from '#ui/layouts/app-header/app-layout-provider';
 import { cn } from '#ui/lib/cn';
 import { shouldReduceMotion } from '#ui/lib/motion';
 import { Image } from '#ui/primitives/data-display/image/image';
+import { SocketStatusBadge } from '#ui/features/games/shared/socket/socket-status-badge';
 
 import type { RouletteOriginalsViewProps } from './roulette-originals-view';
 
@@ -100,12 +101,17 @@ export function useRouletteOriginalsController(
       theatreMode: theatreLayoutActive,
       manualTabLabel: 'Manual',
       autoTabLabel: 'Auto',
-      manualActionLabel: state.spinning ? 'Spinning...' : 'Spin',
+      manualActionLabel: state.isPendingBet
+        ? 'Placing...'
+        : state.spinning
+          ? 'Spinning...'
+          : 'Spin',
       autoActionLabel: autobetAction.label,
       autoActionVariant: autobetAction.variant,
-      manualActionDisabled: !session.canStartManualBet,
-      manualActionPending: state.spinning && state.mode === 'manual',
-      autoActionDisabled: autoBetActive ? false : !session.canStartAutoBet,
+      manualActionDisabled: !session.canStartManualBet || Boolean(state.isPendingBet),
+      manualActionPending:
+        (state.spinning || Boolean(state.isPendingBet)) && state.mode === 'manual',
+      autoActionDisabled: autoBetActive ? false : !session.canStartAutoBet || Boolean(state.isPendingBet),
       onManualAction: session.startManualBet,
       onAutoAction: autoBetActive ? session.stopAutoBet : session.startAutoBet,
       autobetSession: {
@@ -187,6 +193,7 @@ export function useRouletteOriginalsController(
 
   const header: RouletteOriginalsViewProps['header'] = {
     title: 'Roulette',
+    modeControl: <SocketStatusBadge status={session.socketStatus} />,
     volume: session.volume,
     isTheatreMode: session.theatreMode,
     onVolumeChange: session.setVolume,

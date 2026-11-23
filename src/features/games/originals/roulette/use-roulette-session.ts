@@ -21,6 +21,13 @@ import {
 } from './roulette-sounds';
 
 import { getConfiguredMaxRounds } from '#ui/features/games/originals/core/originals-autobet';
+import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
+import { useWallet } from '#ui/features/wallet/wallet-provider';
+
+import {
+  sendRouletteSpinCommand,
+  type RouletteSpinResult,
+} from './roulette-socket';
 
 export interface RouletteHistoryItem {
   id: string;
@@ -35,6 +42,7 @@ export interface RouletteSessionState {
   rounds: string;
   remaining: number;
   spinning: boolean;
+  isPendingBet?: boolean;
   winningBet: RouletteWheelNumber | '-1';
   result: number | null;
   settlement: RouletteSettleResult | null;
@@ -69,7 +77,7 @@ function formatRouletteWinMultiplier(payout: number, winningStake: number): stri
 }
 
 function isBusy(state: RouletteSessionState): boolean {
-  return state.spinning || state.remaining > 0;
+  return state.spinning || Boolean(state.isPendingBet) || state.remaining > 0;
 }
 
 export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
@@ -98,6 +106,11 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     highlightedNumbers: [],
     wins: 0,
   });
+  const wallet = useWallet();
+  const { socket, status: socketStatus, connected } = useGameSocket();
+  const cancelSocketRef = useRef<(() => void) | null>(null);
+  const pendingServerResultRef = useRef<RouletteSpinResult | null>(null);
+
   const stateRef = useRef(state);
   const disposedRef = useRef(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -152,27 +165,56 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
+      cancelSocketRef.current?.();
+      cancelSocketRef.current = null;
       clearHoldTimer();
       if (autoTimerRef.current !== null) clearTimeout(autoTimerRef.current);
     };
   }, []);
 
   const finishSpin = useCallback(
-    (result: number) => {
+    (result: number, serverResult?: RouletteSpinResult | null) => {
       const current = stateRef.current;
-      const settlement = settleRouletteBets(current.bets, result);
-      const won = settlement.payout > 0;
-      // Peer GameWinModal amount = total payout (gross return), not net profit.
-      // Stake was deducted when the spin started; credit payout here so the
-      // modal amount matches the balance credit (same pattern as Mines/Dice).
+      const serverRes = serverResult ?? pendingServerResultRef.current;
+      pendingServerResultRef.current = null;
+
+      let settlement: RouletteSettleResult;
+      let won: boolean;
+      let totalStakeStr: string;
+      let payoutStr: string;
+
+      if (serverRes && serverRes.winningNumber === result) {
+        settlement = {
+          profit: Number(serverRes.profit),
+          payout: Number(serverRes.payoutAmount),
+          winningStake: Number(serverRes.winningStake),
+          totalStake: Number(serverRes.totalStake),
+        };
+        won = serverRes.isWin;
+        totalStakeStr = serverRes.totalStake;
+        payoutStr = serverRes.payoutAmount;
+      } else {
+        settlement = settleRouletteBets(current.bets, result);
+        won = settlement.payout > 0;
+        totalStakeStr = settlement.totalStake.toFixed();
+        payoutStr = settlement.payout.toFixed();
+      }
+
+      wallet.applyRound({
+        betAmount: totalStakeStr,
+        payoutAmount: payoutStr,
+      });
+
       const historyItem: RouletteHistoryItem = {
         id: `roll-${current.round + 1}-${result}-${Date.now()}`,
         number: result,
         won,
       };
+
       update({
         ...current,
         spinning: false,
+        isPendingBet: false,
         winningBet: String(result) as RouletteWheelNumber,
         result,
         settlement,
@@ -200,40 +242,115 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
         });
       }, resultHoldMs);
     },
-    [resultHoldMs, update],
+    [resultHoldMs, update, wallet],
   );
 
   const beginSpin = useCallback(() => {
     const current = stateRef.current;
-    if (disposedRef.current || current.spinning || current.bets.length === 0) return false;
-    const stake = sumRouletteStake(current.bets);
-    if (stake > current.balance + 1e-9) return false;
-
-    const result = getRandomRouletteNumber();
-    clearHoldTimer();
-    // Reserve stake now (peer wallet.applyRound deducts bet up front).
-    const nextBalance = Number((current.balance - stake).toFixed(2));
-    update({
-      ...current,
-      spinning: true,
-      winningBet: String(result) as RouletteWheelNumber,
-      result: null,
-      settlement: null,
-      showWinModal: false,
-      winAmount: '0.00',
-      winMultiplier: 'x0.00',
-      highlightedNumbers: [],
-      balance: nextBalance,
-    });
-
-    // Ball throw / spin whoosh - plays when the wheel spin (and ball motion) starts.
-    playSound('ballSpin');
-
-    if (reducedMotionRef.current) {
-      setTimeout(() => finishSpin(result), 0);
+    if (
+      disposedRef.current ||
+      current.spinning ||
+      current.isPendingBet ||
+      current.bets.length === 0
+    ) {
+      return false;
     }
+
+    const stake = sumRouletteStake(current.bets);
+    const stakeStr = stake.toString();
+    if (stake > current.balance + 1e-9 && !wallet.canAfford(stakeStr)) {
+      if (current.remaining > 0) {
+        update({ ...current, remaining: 0 });
+      }
+      return false;
+    }
+
+    clearHoldTimer();
+    const nextBalance = Number((current.balance - stake).toFixed(2));
+
+    const triggerLocalSpin = () => {
+      const localResult = getRandomRouletteNumber();
+      pendingServerResultRef.current = null;
+      update({
+        ...current,
+        spinning: true,
+        isPendingBet: false,
+        winningBet: String(localResult) as RouletteWheelNumber,
+        result: null,
+        settlement: null,
+        showWinModal: false,
+        winAmount: '0.00',
+        winMultiplier: 'x0.00',
+        highlightedNumbers: [],
+        balance: nextBalance,
+      });
+
+      playSound('ballSpin');
+
+      if (reducedMotionRef.current) {
+        setTimeout(() => finishSpin(localResult, null), 0);
+      }
+    };
+
+    if (socket && connected) {
+      cancelSocketRef.current?.();
+      update({
+        ...current,
+        isPendingBet: true,
+        showWinModal: false,
+        highlightedNumbers: [],
+      });
+
+      cancelSocketRef.current = sendRouletteSpinCommand(
+        socket,
+        {
+          bets: current.bets.map((b) => ({
+            cellId: b.cellId,
+            amount: b.amount.toString(),
+          })),
+          currencyId: wallet.currencyId,
+        },
+        {
+          onResult: (res: RouletteSpinResult) => {
+            cancelSocketRef.current = null;
+            pendingServerResultRef.current = res;
+            const latest = stateRef.current;
+            update({
+              ...latest,
+              spinning: true,
+              isPendingBet: false,
+              winningBet: String(res.winningNumber) as RouletteWheelNumber,
+              result: null,
+              settlement: null,
+              showWinModal: false,
+              winAmount: '0.00',
+              winMultiplier: 'x0.00',
+              highlightedNumbers: [],
+              balance: nextBalance,
+            });
+
+            playSound('ballSpin');
+
+            if (reducedMotionRef.current) {
+              setTimeout(() => finishSpin(res.winningNumber, res), 0);
+            }
+          },
+          onError: (errMsg) => {
+            console.warn(
+              '[Roulette] Socket spin error, falling back to local RNG:',
+              errMsg,
+            );
+            cancelSocketRef.current = null;
+            triggerLocalSpin();
+          },
+        },
+      );
+      return true;
+    }
+
+    triggerLocalSpin();
     return true;
-  }, [finishSpin, playSound, update]);
+  }, [connected, finishSpin, playSound, socket, update, wallet]);
 
   const stopAutoBet = useCallback(() => {
     const current = stateRef.current;
@@ -245,7 +362,12 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
   }, [update]);
 
   useEffect(() => {
-    if (!state.spinning && state.remaining > 0 && state.bets.length > 0) {
+    if (
+      !state.spinning &&
+      !state.isPendingBet &&
+      state.remaining > 0 &&
+      state.bets.length > 0
+    ) {
       autoTimerRef.current = setTimeout(() => {
         autoTimerRef.current = null;
         beginSpin();
@@ -254,7 +376,7 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
         if (autoTimerRef.current !== null) clearTimeout(autoTimerRef.current);
       };
     }
-  }, [state.remaining, state.spinning, state.bets.length, beginSpin]);
+  }, [state.remaining, state.spinning, state.isPendingBet, state.bets.length, beginSpin]);
 
   const edit = (
     patch: Partial<Pick<RouletteSessionState, 'mode' | 'rounds' | 'chip' | 'bets'>>,
@@ -286,7 +408,12 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
       const current = stateRef.current;
       if (isBusy(current)) return;
       const nextStake = sumRouletteStake(current.bets) + current.chip;
-      if (nextStake > current.balance + 1e-9) return;
+      if (
+        nextStake > current.balance + 1e-9 &&
+        !wallet.canAfford(nextStake.toString())
+      ) {
+        return;
+      }
       update({
         ...current,
         bets: addRouletteChip(current.bets, cellId, current.chip),
@@ -319,8 +446,10 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
       const current = stateRef.current;
       if (!current.spinning) return;
       if (String(current.winningBet) !== winner) return;
-      finishSpin(Number(winner));
+      finishSpin(Number(winner), pendingServerResultRef.current);
     },
+    socketStatus,
+    isPendingBet: Boolean(state.isPendingBet),
   };
 }
 

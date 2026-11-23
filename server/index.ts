@@ -562,6 +562,80 @@ function resolveDealerAndSettleBlackjack(game: ActiveBlackjackGame): {
   return { isWin, isLose, isPush, settlement };
 }
 
+// European Roulette constants and helpers
+const ROULETTE_RED_NUMBERS = [
+  1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36,
+] as const;
+
+const ROULETTE_ROW_1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] as const;
+const ROULETTE_ROW_2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35] as const;
+const ROULETTE_ROW_3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34] as const;
+
+let nextRouletteRoundId = 1;
+
+function getRouletteCellNumbers(cellId: string): number[] {
+  const match = /^number-(\d+)$/.exec(cellId);
+  if (match) {
+    const n = Number(match[1]);
+    return Number.isFinite(n) && n >= 0 && n <= 36 ? [n] : [];
+  }
+  switch (cellId) {
+    case '1-12':
+      return Array.from({ length: 12 }, (_, i) => i + 1);
+    case '13-24':
+      return Array.from({ length: 12 }, (_, i) => i + 13);
+    case '25-36':
+      return Array.from({ length: 12 }, (_, i) => i + 25);
+    case '1-18':
+      return Array.from({ length: 18 }, (_, i) => i + 1);
+    case '19-36':
+      return Array.from({ length: 18 }, (_, i) => i + 19);
+    case 'Even':
+      return Array.from({ length: 36 }, (_, i) => i + 1).filter((n) => n % 2 === 0);
+    case 'Odd':
+      return Array.from({ length: 36 }, (_, i) => i + 1).filter((n) => n % 2 === 1);
+    case 'Red':
+      return [...ROULETTE_RED_NUMBERS];
+    case 'Black':
+      return Array.from({ length: 36 }, (_, i) => i + 1).filter(
+        (n) => !ROULETTE_RED_NUMBERS.includes(n as (typeof ROULETTE_RED_NUMBERS)[number]),
+      );
+    case 'Row1':
+      return [...ROULETTE_ROW_1];
+    case 'Row2':
+      return [...ROULETTE_ROW_2];
+    case 'Row3':
+      return [...ROULETTE_ROW_3];
+    default:
+      return [];
+  }
+}
+
+export interface ServerRouletteBetItem {
+  cellId: string;
+  amount: string | number;
+}
+
+export interface ServerRouletteSpinPayload {
+  bets: ServerRouletteBetItem[];
+  currencyId?: string;
+  clientSeed?: string;
+}
+
+export interface ServerRouletteSpinResult {
+  roundId: number;
+  winningNumber: number;
+  color: 'red' | 'black' | 'green';
+  totalStake: string;
+  payoutAmount: string;
+  profit: string;
+  winningStake: string;
+  payoutMultiplier: number;
+  isWin: boolean;
+  currencyId: string;
+  bets: { cellId: string; amount: string }[];
+}
+
 // Create HTTP server for health checks (useful for Render/Koyeb keep-alive)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -579,7 +653,17 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         status: 'ok',
         service: 'casino-originals-ws-server',
-        games: ['dice', 'mines', 'towers', 'keno', 'coinflip', 'plinko', 'double', 'blackjack'],
+        games: [
+          'dice',
+          'mines',
+          'towers',
+          'keno',
+          'coinflip',
+          'plinko',
+          'double',
+          'blackjack',
+          'roulette',
+        ],
         timestamp: new Date().toISOString(),
       }),
     );
@@ -2543,6 +2627,162 @@ io.on('connection', (socket: Socket) => {
       );
     }
   });
+
+  // ============================================
+  // ROULETTE HANDLERS
+  // ============================================
+
+  const handleRouletteSpin = (
+    payload: ServerRouletteSpinPayload,
+    meta?: RequestMeta,
+  ) => {
+    try {
+      const { bets, currencyId = 'btc', clientSeed } = payload ?? {};
+      if (!Array.isArray(bets) || bets.length === 0) {
+        socket.emit(
+          'exception',
+          { message: 'At least one bet must be placed.' },
+          meta,
+        );
+        return;
+      }
+
+      if (bets.length > 100) {
+        socket.emit(
+          'exception',
+          { message: 'Maximum 100 bets allowed per spin.' },
+          meta,
+        );
+        return;
+      }
+
+      let totalStakeBn = new BigNumber(0);
+      const sanitizedBets: { cellId: string; amount: string }[] = [];
+
+      for (const bet of bets) {
+        if (!bet || typeof bet !== 'object') continue;
+        const betBn = new BigNumber(bet.amount);
+        if (!betBn.isFinite() || betBn.lte(0)) {
+          socket.emit(
+            'exception',
+            { message: `Invalid bet amount: ${bet.amount}` },
+            meta,
+          );
+          return;
+        }
+
+        const numbers = getRouletteCellNumbers(bet.cellId);
+        if (numbers.length === 0) {
+          socket.emit(
+            'exception',
+            { message: `Invalid cellId: ${bet.cellId}` },
+            meta,
+          );
+          return;
+        }
+
+        sanitizedBets.push({ cellId: bet.cellId, amount: betBn.toFixed() });
+        totalStakeBn = totalStakeBn.plus(betBn);
+      }
+
+      if (sanitizedBets.length === 0 || totalStakeBn.lte(0)) {
+        socket.emit(
+          'exception',
+          { message: 'No valid bets provided.' },
+          meta,
+        );
+        return;
+      }
+
+      // Determine winning number (0..36)
+      let winningNumber: number;
+      if (clientSeed) {
+        const serverSeed = crypto.randomBytes(32).toString('hex');
+        const hash = crypto
+          .createHmac('sha256', serverSeed)
+          .update(
+            `${clientSeed}:${Date.now()}:${crypto.randomBytes(16).toString('hex')}`,
+          )
+          .digest('hex');
+        winningNumber = parseInt(hash.substring(0, 8), 16) % 37;
+      } else {
+        winningNumber = crypto.randomInt(0, 37);
+      }
+
+      const color: 'red' | 'black' | 'green' =
+        winningNumber === 0
+          ? 'green'
+          : (ROULETTE_RED_NUMBERS as readonly number[]).includes(
+                winningNumber as (typeof ROULETTE_RED_NUMBERS)[number],
+              )
+            ? 'red'
+            : 'black';
+
+      let totalPayoutBn = new BigNumber(0);
+      let totalProfitBn = new BigNumber(0);
+      let winningStakeBn = new BigNumber(0);
+
+      for (const bet of sanitizedBets) {
+        const betBn = new BigNumber(bet.amount);
+        const numbers = getRouletteCellNumbers(bet.cellId);
+        if (numbers.includes(winningNumber)) {
+          const payoutMult = 36 / numbers.length;
+          const profitMult = payoutMult - 1;
+          const betPayout = betBn.times(payoutMult);
+          const betProfit = betBn.times(profitMult);
+
+          totalPayoutBn = totalPayoutBn.plus(betPayout);
+          totalProfitBn = totalProfitBn.plus(betProfit);
+          winningStakeBn = winningStakeBn.plus(betBn);
+        } else {
+          totalProfitBn = totalProfitBn.minus(betBn);
+        }
+      }
+
+      const isWin = totalPayoutBn.gt(0);
+      const payoutMultiplier = winningStakeBn.gt(0)
+        ? Number(totalPayoutBn.dividedBy(winningStakeBn).toFixed(4))
+        : 0;
+
+      const roundId = nextRouletteRoundId++;
+
+      console.log(
+        `[Roulette:Spin] ${socket.id} round #${roundId} -> Number ${winningNumber} (${color}), Stake: ${totalStakeBn.toFixed()} ${currencyId}, Payout: ${totalPayoutBn.toFixed()} (Win: ${isWin})`,
+      );
+
+      const resultData: ServerRouletteSpinResult = {
+        roundId,
+        winningNumber,
+        color,
+        totalStake: totalStakeBn.toFixed(),
+        payoutAmount: totalPayoutBn.toFixed(),
+        profit: totalProfitBn.toFixed(),
+        winningStake: winningStakeBn.toFixed(),
+        payoutMultiplier,
+        isWin,
+        currencyId,
+        bets: sanitizedBets,
+      };
+
+      socket.emit('roulette:spin:result', resultData, meta);
+      socket.emit('roulette:result', resultData, meta);
+    } catch (err: unknown) {
+      console.error('[Roulette:Spin] Error:', err);
+      socket.emit(
+        'exception',
+        {
+          message:
+            err instanceof Error
+              ? err.message
+              : 'Error processing Roulette spin.',
+        },
+        meta,
+      );
+    }
+  };
+
+  socket.on('roulette:spin', handleRouletteSpin);
+  socket.on('roulette:bet', handleRouletteSpin);
 
   socket.on('disconnect', () => {
     activeMinesGames.delete(socket.id);
