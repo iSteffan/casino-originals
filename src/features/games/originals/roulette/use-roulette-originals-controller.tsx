@@ -85,8 +85,7 @@ export function useRouletteOriginalsController(
   const winRatePct =
     state.round === 0 ? 0 : Math.round((state.wins / state.round) * 100);
 
-  const balanceDelta = state.balance - 1000;
-  const netProfitLabel = `${balanceDelta >= 0 ? '+' : ''}${formatRouletteMoney(balanceDelta)}`;
+  const netProfitLabel = `${state.totalProfit >= 0 ? '+' : ''}${formatRouletteMoney(state.totalProfit)}`;
   const totalLabel = `Stake ${formatRouletteMoney(session.totalStake)} | Balance ${formatRouletteMoney(state.balance)}`;
 
   const undoIcon = <IconImg src={rouletteStoryUndoIconSrc} />;
@@ -116,9 +115,7 @@ export function useRouletteOriginalsController(
       onAutoAction: autoBetActive ? session.stopAutoBet : session.startAutoBet,
       autobetSession: {
         state: autoBetActive ? 'live' : 'ready-to-start',
-        totalWagered: formatRouletteMoney(
-          Math.max(0, 1000 - state.balance + session.totalStake),
-        ),
+        totalWagered: formatRouletteMoney(state.totalWagered),
         netProfit: netProfitLabel,
         winRate: `${winRatePct}%`,
       },

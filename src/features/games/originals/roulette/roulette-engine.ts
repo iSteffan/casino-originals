@@ -47,20 +47,24 @@ export function getRouletteProfitMultiplier(cellId: string): number {
   return 36 / numbers.length - 1;
 }
 
+let betIdCounter = 0;
+
 export function addRouletteChip(
   bets: readonly RouletteBet[],
   cellId: string,
   amount: number,
-  maxStack = 5,
+  maxStack = 100,
 ): RouletteBet[] {
   if (!Number.isFinite(amount) || amount <= 0) return [...bets];
   if (getRouletteCellNumbers(cellId).length === 0) return [...bets];
+  if (bets.length >= 100) return [...bets];
   const stackCount = bets.filter((bet) => bet.cellId === cellId).length;
   if (stackCount >= maxStack) return [...bets];
+  betIdCounter += 1;
   return [
     ...bets,
     {
-      id: `${cellId}-${Date.now()}-${bets.length}`,
+      id: `${cellId}-${Date.now()}-${betIdCounter}`,
       cellId,
       amount,
     },

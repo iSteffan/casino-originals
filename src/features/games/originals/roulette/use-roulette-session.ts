@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import BigNumber from 'bignumber.js';
+
 import {
   addRouletteChip,
   getRandomRouletteNumber,
@@ -20,8 +22,13 @@ import {
   type RouletteSoundName,
 } from './roulette-sounds';
 
+import type { CashierCurrencyId } from '#ui/features/cashier/cashier-dropdown/cashier-dropdown.types';
 import { getConfiguredMaxRounds } from '#ui/features/games/originals/core/originals-autobet';
 import { useGameSocket } from '#ui/features/games/shared/socket/game-socket';
+import {
+  fiatToCryptoAmount,
+  WALLET_FIAT_RATES,
+} from '#ui/features/wallet/wallet-balances';
 import { useWallet } from '#ui/features/wallet/wallet-provider';
 
 import {
@@ -56,12 +63,27 @@ export interface RouletteSessionState {
   balance: number;
   highlightedNumbers: number[];
   wins: number;
+  totalWagered: number;
+  totalProfit: number;
 }
 
 export interface UseRouletteSessionOptions {
   initialBalance?: number;
   resultHoldMs?: number;
   reducedMotion?: boolean;
+}
+
+function getWalletFiatBalance(
+  cryptoBalance: string | undefined,
+  currencyId: CashierCurrencyId,
+): number {
+  if (!cryptoBalance) return 0;
+  const crypto = new BigNumber(cryptoBalance);
+  const rate = new BigNumber(WALLET_FIAT_RATES[currencyId] ?? 1);
+  if (!crypto.isFinite() || crypto.lte(0) || !rate.isFinite() || rate.lte(0)) {
+    return 0;
+  }
+  return Number(crypto.times(rate).toFixed(2, BigNumber.ROUND_DOWN));
 }
 
 function formatRouletteWinAmount(amount: number): string {
@@ -87,6 +109,11 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     reducedMotion = false,
   } = options;
 
+  const wallet = useWallet();
+  const initialFiat =
+    getWalletFiatBalance(wallet?.balances?.[wallet?.currencyId], wallet?.currencyId) ||
+    initialBalance;
+
   const [state, setState] = useState<RouletteSessionState>({
     bets: [],
     chip: 1,
@@ -102,17 +129,19 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     showWinModal: false,
     winAmount: '0.00',
     winMultiplier: 'x0.00',
-    balance: initialBalance,
+    balance: initialFiat,
     highlightedNumbers: [],
     wins: 0,
+    totalWagered: 0,
+    totalProfit: 0,
   });
-  const wallet = useWallet();
   const { socket, status: socketStatus, connected } = useGameSocket();
   const cancelSocketRef = useRef<(() => void) | null>(null);
   const pendingServerResultRef = useRef<RouletteSpinResult | null>(null);
 
   const stateRef = useRef(state);
   const disposedRef = useRef(false);
+  const prevCurrencyIdRef = useRef(wallet.currencyId);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reducedMotionRef = useRef(reducedMotion);
@@ -172,6 +201,43 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     };
   }, []);
 
+  // Keep available balance in sync with wallet.balances updates
+  useEffect(() => {
+    const current = stateRef.current;
+    if (isBusy(current)) return;
+    const fiat = getWalletFiatBalance(
+      wallet.balances[wallet.currencyId],
+      wallet.currencyId,
+    );
+    const stake = sumRouletteStake(current.bets);
+    const available = Math.max(0, Number((fiat - stake).toFixed(2)));
+    if (Math.abs(current.balance - available) > 0.001) {
+      update({
+        ...current,
+        balance: available,
+      });
+    }
+  }, [wallet.balances, wallet.currencyId, update]);
+
+  // When cashier currency changes, reset bets and sync balance
+  useEffect(() => {
+    if (prevCurrencyIdRef.current !== wallet.currencyId) {
+      prevCurrencyIdRef.current = wallet.currencyId;
+      const current = stateRef.current;
+      if (!isBusy(current)) {
+        const fiat = getWalletFiatBalance(
+          wallet.balances[wallet.currencyId],
+          wallet.currencyId,
+        );
+        update({
+          ...current,
+          bets: [],
+          balance: fiat,
+        });
+      }
+    }
+  }, [wallet.currencyId, wallet.balances, update]);
+
   const finishSpin = useCallback(
     (result: number, serverResult?: RouletteSpinResult | null) => {
       const current = stateRef.current;
@@ -180,8 +246,6 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
 
       let settlement: RouletteSettleResult;
       let won: boolean;
-      let totalStakeStr: string;
-      let payoutStr: string;
 
       if (serverRes && serverRes.winningNumber === result) {
         settlement = {
@@ -191,19 +255,35 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
           totalStake: Number(serverRes.totalStake),
         };
         won = serverRes.isWin;
-        totalStakeStr = serverRes.totalStake;
-        payoutStr = serverRes.payoutAmount;
       } else {
         settlement = settleRouletteBets(current.bets, result);
         won = settlement.payout > 0;
-        totalStakeStr = settlement.totalStake.toFixed();
-        payoutStr = settlement.payout.toFixed();
       }
 
-      wallet.applyRound({
-        betAmount: totalStakeStr,
-        payoutAmount: payoutStr,
-      });
+      // Convert fiat amounts to crypto units for wallet.applyRound
+      const totalStakeNum = settlement.totalStake;
+      const payoutNum = settlement.payout;
+      const betCrypto = fiatToCryptoAmount(totalStakeNum.toFixed(2), wallet.currencyId);
+      const payoutCrypto = payoutNum > 0
+        ? fiatToCryptoAmount(payoutNum.toFixed(2), wallet.currencyId)
+        : '0';
+
+      if (betCrypto) {
+        wallet.applyRound({
+          betAmount: betCrypto,
+          payoutAmount: payoutCrypto || '0',
+        });
+      }
+
+      const currentFiat = getWalletFiatBalance(
+        wallet.balances[wallet.currencyId],
+        wallet.currencyId,
+      );
+      const postRoundFiat = Number(
+        (currentFiat - totalStakeNum + payoutNum).toFixed(2),
+      );
+      const currentStake = sumRouletteStake(current.bets);
+      const endBalance = Math.max(0, Number((postRoundFiat - currentStake).toFixed(2)));
 
       const historyItem: RouletteHistoryItem = {
         id: `roll-${current.round + 1}-${result}-${Date.now()}`,
@@ -227,9 +307,11 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
           settlement.payout,
           settlement.winningStake,
         ),
-        balance: Number((current.balance + settlement.payout).toFixed(2)),
+        balance: endBalance,
         highlightedNumbers: [result],
         wins: current.wins + (won ? 1 : 0),
+        totalWagered: Number((current.totalWagered + totalStakeNum).toFixed(2)),
+        totalProfit: Number((current.totalProfit + settlement.profit).toFixed(2)),
       });
 
       clearHoldTimer();
@@ -257,8 +339,21 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     }
 
     const stake = sumRouletteStake(current.bets);
-    const stakeStr = stake.toString();
-    if (stake > current.balance + 1e-9 && !wallet.canAfford(stakeStr)) {
+    const currentFiat = getWalletFiatBalance(
+      wallet.balances[wallet.currencyId],
+      wallet.currencyId,
+    );
+    const effectiveBalance = currentFiat > 0 ? currentFiat : current.balance;
+
+    if (stake <= 0 || stake > effectiveBalance + 1e-9) {
+      if (current.remaining > 0) {
+        update({ ...current, remaining: 0 });
+      }
+      return false;
+    }
+
+    const stakeCrypto = fiatToCryptoAmount(stake.toFixed(2), wallet.currencyId);
+    if (stakeCrypto && !wallet.canAfford(stakeCrypto)) {
       if (current.remaining > 0) {
         update({ ...current, remaining: 0 });
       }
@@ -266,7 +361,7 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     }
 
     clearHoldTimer();
-    const nextBalance = Number((current.balance - stake).toFixed(2));
+    const nextBalance = Math.max(0, Number((effectiveBalance - stake).toFixed(2)));
 
     const triggerLocalSpin = () => {
       const localResult = getRandomRouletteNumber();
@@ -407,24 +502,57 @@ export function useRouletteSession(options: UseRouletteSessionOptions = {}) {
     placeChip: (cellId: string) => {
       const current = stateRef.current;
       if (isBusy(current)) return;
+      const currentFiat = getWalletFiatBalance(
+        wallet.balances[wallet.currencyId],
+        wallet.currencyId,
+      );
+      const effectiveFiat = currentFiat > 0 ? currentFiat : current.balance;
       const nextStake = sumRouletteStake(current.bets) + current.chip;
-      if (
-        nextStake > current.balance + 1e-9 &&
-        !wallet.canAfford(nextStake.toString())
-      ) {
+      if (nextStake > effectiveFiat + 1e-9) {
         return;
       }
+      const nextBets = addRouletteChip(current.bets, cellId, current.chip);
+      const newTotalStake = sumRouletteStake(nextBets);
       update({
         ...current,
-        bets: addRouletteChip(current.bets, cellId, current.chip),
+        bets: nextBets,
+        balance: Math.max(0, Number((effectiveFiat - newTotalStake).toFixed(2))),
       });
     },
     setHighlightedNumbers: (highlightedNumbers: number[]) => {
       if (stateRef.current.spinning) return;
       update({ ...stateRef.current, highlightedNumbers });
     },
-    undo: () => edit({ bets: stateRef.current.bets.slice(0, -1) }),
-    clear: () => edit({ bets: [] }),
+    undo: () => {
+      const current = stateRef.current;
+      if (isBusy(current)) return;
+      const currentFiat = getWalletFiatBalance(
+        wallet.balances[wallet.currencyId],
+        wallet.currencyId,
+      );
+      const effectiveFiat = currentFiat > 0 ? currentFiat : current.balance;
+      const nextBets = current.bets.slice(0, -1);
+      const newTotalStake = sumRouletteStake(nextBets);
+      update({
+        ...current,
+        bets: nextBets,
+        balance: Math.max(0, Number((effectiveFiat - newTotalStake).toFixed(2))),
+      });
+    },
+    clear: () => {
+      const current = stateRef.current;
+      if (isBusy(current)) return;
+      const currentFiat = getWalletFiatBalance(
+        wallet.balances[wallet.currencyId],
+        wallet.currencyId,
+      );
+      const effectiveFiat = currentFiat > 0 ? currentFiat : current.balance;
+      update({
+        ...current,
+        bets: [],
+        balance: effectiveFiat,
+      });
+    },
     startManualBet: () => {
       const current = stateRef.current;
       if (current.mode === 'manual' && !isBusy(current)) beginSpin();
